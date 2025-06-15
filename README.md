@@ -9,6 +9,8 @@ SysLogger is a lightweight, containerized syslog server designed to receive and 
 - Minimal configuration, plug-and-play setup
 - Supports UDP and TCP log forwarding
 - Logs are written to a file and can be forwarded to another syslog server
+- Automatic log rotation with configurable size and retention
+- Optional logging to STDOUT for debugging
 
 ## Usage
 
@@ -27,6 +29,9 @@ SysLogger is a lightweight, containerized syslog server designed to receive and 
 - `LOG_FILE` – path to the log file inside the container (`/logs/syslog.log` by default)
 - `LOG_LEVEL` – Python logging level (e.g. `INFO`, `DEBUG`)
 - `FORWARD_HOST` and `FORWARD_PORT` – if set, messages will also be forwarded to another syslog server
+- `MAX_BYTES` – rotate log files when they reach this size (default `10485760`)
+- `BACKUP_COUNT` – number of rotated log files to keep (default `5`)
+- `LOG_TO_STDOUT` – if `true`, also print logs to the console
 
 ## Example
 

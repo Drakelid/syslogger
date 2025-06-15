@@ -10,6 +10,9 @@ LOG_FILE = os.getenv('LOG_FILE', '/logs/syslog.log')
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
 FORWARD_HOST = os.getenv('FORWARD_HOST')
 FORWARD_PORT = os.getenv('FORWARD_PORT')
+MAX_BYTES = int(os.getenv('MAX_BYTES', '10485760'))  # 10 MB
+BACKUP_COUNT = int(os.getenv('BACKUP_COUNT', '5'))
+LOG_TO_STDOUT = os.getenv('LOG_TO_STDOUT', 'false').lower() in ('1', 'true', 'yes')
 
 # Ensure log directory exists
 os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
@@ -19,9 +22,16 @@ logger.setLevel(LOG_LEVEL)
 
 formatter = logging.Formatter('%(asctime)s %(message)s')
 
-file_handler = logging.FileHandler(LOG_FILE)
+file_handler = logging.handlers.RotatingFileHandler(
+    LOG_FILE, maxBytes=MAX_BYTES, backupCount=BACKUP_COUNT
+)
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
+
+if LOG_TO_STDOUT:
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(formatter)
+    logger.addHandler(stream_handler)
 
 if FORWARD_HOST and FORWARD_PORT:
     try:
