@@ -11,7 +11,7 @@ SysLogger is a lightweight, containerized syslog server designed to receive and 
 - Logs are written to a file and can be forwarded to another syslog server
 - Automatic log rotation with configurable size and retention
 - Optional logging to STDOUT for debugging
-- Lightweight web interface that highlights potential attacks
+- Modern web interface that highlights potential attacks and displays recent logs
 
 ## Usage
 
@@ -38,6 +38,7 @@ SysLogger is a lightweight, containerized syslog server designed to receive and 
 - `ENABLE_UDP` and `ENABLE_TCP` – enable or disable UDP/TCP servers (default `true`)
 - `ENABLE_WEB` – start the web interface (default `true`)
 - `WEB_PORT` – port for the web interface (default `8080`)
+- `WEB_LOG_LINES` – number of log lines to display in the web interface (default `100`)
 
 ## Example
 

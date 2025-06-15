@@ -19,3 +19,4 @@ services:
       ENABLE_TCP: 'true'
       ENABLE_WEB: 'true'
       WEB_PORT: 8080
+      WEB_LOG_LINES: 100

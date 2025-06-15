@@ -21,6 +21,7 @@ ENABLE_UDP = os.getenv('ENABLE_UDP', 'true').lower() in ('1', 'true', 'yes')
 ENABLE_TCP = os.getenv('ENABLE_TCP', 'true').lower() in ('1', 'true', 'yes')
 ENABLE_WEB = os.getenv('ENABLE_WEB', 'true').lower() in ('1', 'true', 'yes')
 WEB_PORT = int(os.getenv('WEB_PORT', '8080'))
+WEB_LOG_LINES = int(os.getenv('WEB_LOG_LINES', '100'))
 
 # Ensure log directory exists
 os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
@@ -41,19 +42,41 @@ app = Flask(__name__)
 
 INDEX_TEMPLATE = """
 <!doctype html>
-<html>
-<head><title>SysLogger Alerts</title></head>
+<html lang=\"en\">
+<head>
+  <meta charset=\"utf-8\">
+  <title>SysLogger Dashboard</title>
+  <style>
+    body {font-family: Arial, Helvetica, sans-serif; margin:0; background:#f5f5f5;}
+    header {background:#2c3e50; color:#fff; padding:20px 0; text-align:center;}
+    .container {max-width:800px; margin:20px auto; padding:20px; background:#fff;
+        box-shadow:0 2px 4px rgba(0,0,0,0.1); border-radius:4px;}
+    .alert {background:#f8d7da; border-left:4px solid #c0392b; padding:10px; margin-bottom:10px;}
+    .log {background:#fafafa; padding:10px; height:300px; overflow-y:auto; font-family:monospace; border:1px solid #ddd;}
+    h2 {border-bottom:1px solid #eee; padding-bottom:4px; margin-top:20px;}
+  </style>
+</head>
 <body>
-  <h1>Detected Events</h1>
-  {% if alerts %}
-  <ul>
-    {% for a in alerts %}
-      <li><strong>{{ a[0] }}:</strong> {{ a[1] }}</li>
+  <header>
+    <h1>SysLogger Dashboard</h1>
+  </header>
+  <div class=\"container\">
+    <h2>Detected Events</h2>
+    {% if alerts %}
+      {% for a in alerts %}
+        <div class=\"alert\"><strong>{{ a[0] }}:</strong> {{ a[1] }}</div>
+      {% endfor %}
+    {% else %}
+      <p>No suspicious activity detected.</p>
+    {% endif %}
+
+    <h2>Recent Logs</h2>
+    <div class=\"log\">
+    {% for line in logs %}
+      {{ line }}<br>
     {% endfor %}
-  </ul>
-  {% else %}
-  <p>No suspicious activity detected.</p>
-  {% endif %}
+    </div>
+  </div>
 </body>
 </html>
 """
@@ -75,10 +98,22 @@ def analyze_logs():
             alerts.append(('Authentication Failure', line.strip()))
     return alerts
 
+def get_recent_logs(num=WEB_LOG_LINES):
+    if not os.path.exists(LOG_FILE):
+        return []
+    try:
+        with open(LOG_FILE, 'r') as f:
+            lines = f.readlines()[-num:]
+    except Exception:
+        return []
+    return [line.strip() for line in lines]
+
+
 @app.route('/')
 def index():
     alerts = analyze_logs()
-    return render_template_string(INDEX_TEMPLATE, alerts=alerts)
+    logs = get_recent_logs()
+    return render_template_string(INDEX_TEMPLATE, alerts=alerts, logs=logs)
 
 if LOG_TO_STDOUT:
     stream_handler = logging.StreamHandler()
