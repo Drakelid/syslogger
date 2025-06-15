@@ -12,6 +12,7 @@ SysLogger is a lightweight, containerized syslog server designed to receive and 
 - Automatic log rotation with configurable size and retention
 - Optional logging to STDOUT for debugging
 - Modern web interface that highlights potential attacks and displays recent logs
+- Detects repeated deauthentication and authentication failures to flag possible brute-force attacks
 
 ## Usage
 
@@ -44,6 +45,8 @@ SysLogger is a lightweight, containerized syslog server designed to receive and 
 - `ENABLE_WEB` – start the web interface (default `true`)
 - `WEB_PORT` – port for the web interface (default `8080`)
 - `WEB_LOG_LINES` – number of log lines to display in the web interface (default `100`)
+- `DEAUTH_THRESHOLD` – number of deauthentication events from a client before an alert (default `3`)
+- `AUTH_FAIL_THRESHOLD` – number of authentication failures from an IP before an alert (default `5`)
 
 ## Example
 

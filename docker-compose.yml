@@ -17,3 +17,5 @@ services:
       ENABLE_WEB: 'true'
       WEB_PORT: 8080
       WEB_LOG_LINES: 100
+      DEAUTH_THRESHOLD: 3
+      AUTH_FAIL_THRESHOLD: 5

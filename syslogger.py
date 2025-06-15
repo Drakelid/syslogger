@@ -6,6 +6,7 @@ from flask import Flask, render_template_string
 import socketserver
 import threading
 import time
+import re
 
 LOG_FILE = os.getenv('LOG_FILE', '/logs/syslog.log')
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
@@ -22,6 +23,8 @@ ENABLE_TCP = os.getenv('ENABLE_TCP', 'true').lower() in ('1', 'true', 'yes')
 ENABLE_WEB = os.getenv('ENABLE_WEB', 'true').lower() in ('1', 'true', 'yes')
 WEB_PORT = int(os.getenv('WEB_PORT', '8080'))
 WEB_LOG_LINES = int(os.getenv('WEB_LOG_LINES', '100'))
+DEAUTH_THRESHOLD = int(os.getenv('DEAUTH_THRESHOLD', '3'))
+AUTH_FAIL_THRESHOLD = int(os.getenv('AUTH_FAIL_THRESHOLD', '5'))
 
 # Ensure log directory exists
 os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
@@ -90,12 +93,36 @@ def analyze_logs():
             lines = f.readlines()[-1000:]
     except Exception:
         return alerts
+
+    deauth_map = {}
+    auth_map = {}
+
     for line in lines:
         lower = line.lower()
         if 'deauth' in lower or 'disassoc' in lower:
-            alerts.append(('Deauthentication', line.strip()))
-        elif 'failed password' in lower or 'authentication failure' in lower:
-            alerts.append(('Authentication Failure', line.strip()))
+            mac = None
+            m = re.search(r'([0-9a-f]{2}:){5}[0-9a-f]{2}', lower)
+            if m:
+                mac = m.group()
+            key = mac or 'unknown'
+            deauth_map[key] = deauth_map.get(key, 0) + 1
+        if 'failed password' in lower or 'authentication failure' in lower:
+            ip = None
+            m = re.search(r'(\d+\.){3}\d+', line)
+            if m:
+                ip = m.group()
+            key = ip or 'unknown'
+            auth_map[key] = auth_map.get(key, 0) + 1
+        if 'syn flood' in lower or 'port scan' in lower or 'attack' in lower:
+            alerts.append(('Possible Attack', line.strip()))
+
+    for mac, count in deauth_map.items():
+        if count >= DEAUTH_THRESHOLD:
+            alerts.append(('Deauth Flood', f'{mac} seen {count} times'))
+    for ip, count in auth_map.items():
+        if count >= AUTH_FAIL_THRESHOLD:
+            alerts.append(('Auth Brute Force', f'{ip} failed {count} times'))
+
     return alerts
 
 def get_recent_logs(num=WEB_LOG_LINES):
