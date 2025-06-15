@@ -2,6 +2,7 @@
 import os
 import logging
 import logging.handlers
+from flask import Flask, render_template_string
 import socketserver
 import threading
 import time
@@ -18,6 +19,8 @@ UDP_PORT = int(os.getenv('UDP_PORT', '514'))
 TCP_PORT = int(os.getenv('TCP_PORT', '514'))
 ENABLE_UDP = os.getenv('ENABLE_UDP', 'true').lower() in ('1', 'true', 'yes')
 ENABLE_TCP = os.getenv('ENABLE_TCP', 'true').lower() in ('1', 'true', 'yes')
+ENABLE_WEB = os.getenv('ENABLE_WEB', 'true').lower() in ('1', 'true', 'yes')
+WEB_PORT = int(os.getenv('WEB_PORT', '8080'))
 
 # Ensure log directory exists
 os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
@@ -32,6 +35,50 @@ file_handler = logging.handlers.RotatingFileHandler(
 )
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
+
+# Web interface setup
+app = Flask(__name__)
+
+INDEX_TEMPLATE = """
+<!doctype html>
+<html>
+<head><title>SysLogger Alerts</title></head>
+<body>
+  <h1>Detected Events</h1>
+  {% if alerts %}
+  <ul>
+    {% for a in alerts %}
+      <li><strong>{{ a[0] }}:</strong> {{ a[1] }}</li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p>No suspicious activity detected.</p>
+  {% endif %}
+</body>
+</html>
+"""
+
+def analyze_logs():
+    alerts = []
+    if not os.path.exists(LOG_FILE):
+        return alerts
+    try:
+        with open(LOG_FILE, 'r') as f:
+            lines = f.readlines()[-1000:]
+    except Exception:
+        return alerts
+    for line in lines:
+        lower = line.lower()
+        if 'deauth' in lower or 'disassoc' in lower:
+            alerts.append(('Deauthentication', line.strip()))
+        elif 'failed password' in lower or 'authentication failure' in lower:
+            alerts.append(('Authentication Failure', line.strip()))
+    return alerts
+
+@app.route('/')
+def index():
+    alerts = analyze_logs()
+    return render_template_string(INDEX_TEMPLATE, alerts=alerts)
 
 if LOG_TO_STDOUT:
     stream_handler = logging.StreamHandler()
@@ -68,6 +115,10 @@ def run_tcp_server(host=BIND_HOST, port=TCP_PORT):
         server.serve_forever()
 
 
+def run_web_server(host=BIND_HOST, port=WEB_PORT):
+    app.run(host=host, port=port, debug=False, use_reloader=False)
+
+
 def main():
     threads = []
     if ENABLE_UDP:
@@ -78,9 +129,13 @@ def main():
         tcp_thread = threading.Thread(target=run_tcp_server, daemon=True)
         tcp_thread.start()
         threads.append(tcp_thread)
+    if ENABLE_WEB:
+        web_thread = threading.Thread(target=run_web_server, daemon=True)
+        web_thread.start()
+        threads.append(web_thread)
 
     if not threads:
-        logger.error('No protocols enabled. Set ENABLE_UDP and/or ENABLE_TCP.')
+        logger.error('No services enabled. Enable UDP, TCP and/or WEB interface.')
         return
 
     logger.info('SysLogger started')
