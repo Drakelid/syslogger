@@ -15,18 +15,18 @@ SysLogger is a lightweight, containerized syslog server designed to receive and 
 
 ## Usage
 
-1. Build and start the container using Docker Compose. The provided
-   configuration maps the syslog and web ports to the host so they are
-   reachable from other devices on your LAN:
+1. Build and start the container using Docker Compose. The configuration
+   runs the container with host networking so the syslog and web ports are
+   reachable from other devices on your LAN without additional port mapping:
    ```bash
    docker-compose up --build
    ```
    Logs will be stored in the `logs/` directory on the host.
 
-2. Point your ASUS router's syslog settings to the IP address of the Docker host
-   on the configured port (default `514`). The container exposes port `514` for
-   both UDP and TCP, so the router can reach the syslog service directly on the
-   host IP.
+2. Point your ASUS router's syslog settings to the IP address of the Docker
+   host on the configured port (default `514`). Because SysLogger uses host
+   networking, the router can send logs directly to the host IP without any
+   extra port mappings.
 
 3. Check `logs/syslog.log` for incoming messages.
 
