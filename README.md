@@ -20,7 +20,7 @@ SysLogger is a lightweight, containerized syslog server designed to receive and 
    ```
    Logs will be stored in the `logs/` directory on the host.
 
-2. Point your ASUS router's syslog settings to the IP address of the Docker host on port `514` (UDP or TCP).
+2. Point your ASUS router's syslog settings to the IP address of the Docker host on the configured port (default `514`).
 
 3. Check `logs/syslog.log` for incoming messages.
 
@@ -32,13 +32,20 @@ SysLogger is a lightweight, containerized syslog server designed to receive and 
 - `MAX_BYTES` – rotate log files when they reach this size (default `10485760`)
 - `BACKUP_COUNT` – number of rotated log files to keep (default `5`)
 - `LOG_TO_STDOUT` – if `true`, also print logs to the console
+- `BIND_HOST` – interface to bind to (default `0.0.0.0`)
+- `UDP_PORT` and `TCP_PORT` – listening ports for UDP and TCP (default `514`)
+- `ENABLE_UDP` and `ENABLE_TCP` – enable or disable UDP/TCP servers (default `true`)
 
 ## Example
 
-To forward logs to another syslog server at `192.168.1.10:514`, run:
+To forward logs to another syslog server at `192.168.1.10:514` while listening on a custom port, run:
 
 ```bash
-docker-compose run -e FORWARD_HOST=192.168.1.10 -e FORWARD_PORT=514 syslogger
+docker-compose run \
+  -e FORWARD_HOST=192.168.1.10 \
+  -e FORWARD_PORT=514 \
+  -e TCP_PORT=1514 \
+  syslogger
 ```
 
 SysLogger provides a simple way to collect and inspect your router logs without additional dependencies.

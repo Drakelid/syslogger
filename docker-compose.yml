@@ -10,3 +10,9 @@ services:
       - "514:514/tcp"
     environment:
       LOG_FILE: /logs/syslog.log
+      LOG_LEVEL: INFO
+      BIND_HOST: 0.0.0.0
+      UDP_PORT: 514
+      TCP_PORT: 514
+      ENABLE_UDP: 'true'
+      ENABLE_TCP: 'true'

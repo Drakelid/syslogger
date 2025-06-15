@@ -13,6 +13,11 @@ FORWARD_PORT = os.getenv('FORWARD_PORT')
 MAX_BYTES = int(os.getenv('MAX_BYTES', '10485760'))  # 10 MB
 BACKUP_COUNT = int(os.getenv('BACKUP_COUNT', '5'))
 LOG_TO_STDOUT = os.getenv('LOG_TO_STDOUT', 'false').lower() in ('1', 'true', 'yes')
+BIND_HOST = os.getenv('BIND_HOST', '0.0.0.0')
+UDP_PORT = int(os.getenv('UDP_PORT', '514'))
+TCP_PORT = int(os.getenv('TCP_PORT', '514'))
+ENABLE_UDP = os.getenv('ENABLE_UDP', 'true').lower() in ('1', 'true', 'yes')
+ENABLE_TCP = os.getenv('ENABLE_TCP', 'true').lower() in ('1', 'true', 'yes')
 
 # Ensure log directory exists
 os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
@@ -53,22 +58,30 @@ class SyslogTCPHandler(socketserver.StreamRequestHandler):
         logger.info(f"{self.client_address[0]} {data}")
 
 
-def run_udp_server(host='0.0.0.0', port=514):
-    server = socketserver.ThreadingUDPServer((host, port), SyslogUDPHandler)
-    server.serve_forever()
+def run_udp_server(host=BIND_HOST, port=UDP_PORT):
+    with socketserver.ThreadingUDPServer((host, port), SyslogUDPHandler) as server:
+        server.serve_forever()
 
 
-def run_tcp_server(host='0.0.0.0', port=514):
-    server = socketserver.ThreadingTCPServer((host, port), SyslogTCPHandler)
-    server.serve_forever()
+def run_tcp_server(host=BIND_HOST, port=TCP_PORT):
+    with socketserver.ThreadingTCPServer((host, port), SyslogTCPHandler) as server:
+        server.serve_forever()
 
 
 def main():
-    udp_thread = threading.Thread(target=run_udp_server, daemon=True)
-    tcp_thread = threading.Thread(target=run_tcp_server, daemon=True)
+    threads = []
+    if ENABLE_UDP:
+        udp_thread = threading.Thread(target=run_udp_server, daemon=True)
+        udp_thread.start()
+        threads.append(udp_thread)
+    if ENABLE_TCP:
+        tcp_thread = threading.Thread(target=run_tcp_server, daemon=True)
+        tcp_thread.start()
+        threads.append(tcp_thread)
 
-    udp_thread.start()
-    tcp_thread.start()
+    if not threads:
+        logger.error('No protocols enabled. Set ENABLE_UDP and/or ENABLE_TCP.')
+        return
 
     logger.info('SysLogger started')
     try:
