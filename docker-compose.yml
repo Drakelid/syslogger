@@ -1,0 +1,12 @@
+version: '3'
+services:
+  syslogger:
+    build: .
+    container_name: syslogger
+    volumes:
+      - ./logs:/logs
+    ports:
+      - "514:514/udp"
+      - "514:514/tcp"
+    environment:
+      LOG_FILE: /logs/syslog.log

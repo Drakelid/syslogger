@@ -1,0 +1,39 @@
+# SysLogger
+
+SysLogger is a lightweight, containerized syslog server designed to receive and manage system logs from ASUS routers. Running in a Docker environment, it captures, stores and optionally forwards syslog messages for diagnostics, monitoring and auditing purposes.
+
+## Features
+
+- Runs as a standalone syslog server in a Docker container
+- Optimized for ASUS router syslog output (e.g. RT-AX88U, RT-AC86U)
+- Minimal configuration, plug-and-play setup
+- Supports UDP and TCP log forwarding
+- Logs are written to a file and can be forwarded to another syslog server
+
+## Usage
+
+1. Build and start the container using Docker Compose:
+   ```bash
+   docker-compose up --build
+   ```
+   Logs will be stored in the `logs/` directory on the host.
+
+2. Point your ASUS router's syslog settings to the IP address of the Docker host on port `514` (UDP or TCP).
+
+3. Check `logs/syslog.log` for incoming messages.
+
+### Environment Variables
+
+- `LOG_FILE` – path to the log file inside the container (`/logs/syslog.log` by default)
+- `LOG_LEVEL` – Python logging level (e.g. `INFO`, `DEBUG`)
+- `FORWARD_HOST` and `FORWARD_PORT` – if set, messages will also be forwarded to another syslog server
+
+## Example
+
+To forward logs to another syslog server at `192.168.1.10:514`, run:
+
+```bash
+docker-compose run -e FORWARD_HOST=192.168.1.10 -e FORWARD_PORT=514 syslogger
+```
+
+SysLogger provides a simple way to collect and inspect your router logs without additional dependencies.
