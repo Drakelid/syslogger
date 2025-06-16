@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+"""Simple syslog monitor with rolling window alerts."""
+
 import re
 import sys
 from collections import defaultdict
@@ -14,7 +17,7 @@ ALERT_WINDOW_MINUTES = 5
 TIME_PATTERN = re.compile(r'^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]')
 TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 
-# Store event timestamps
+# Store event timestamps for each event keyword
 EVENT_TIMES = defaultdict(list)
 
 def parse_time(line):
@@ -43,15 +46,22 @@ def record_event(event, timestamp):
         )
 
 def monitor(log_file):
-    with open(log_file, 'r') as f:
+    """Read a log file and process each line for alerts."""
+    with open(log_file, "r") as f:
         for line in f:
             ts = parse_time(line)
             for event in THRESHOLDS:
                 if event in line:
                     record_event(event, ts)
 
-if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print(f"Usage: {sys.argv[0]} <logfile>")
-        sys.exit(1)
-    monitor(sys.argv[1])
+def main(argv):
+    """Entry point for command-line execution."""
+    if len(argv) != 2:
+        print(f"Usage: {argv[0]} <logfile>")
+        return 1
+    monitor(argv[1])
+    return 0
+
+
+if __name__ == "__main__":  # pragma: no cover - manual invocation only
+    raise SystemExit(main(sys.argv))

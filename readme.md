@@ -1,4 +1,4 @@
-# Sys Log Monitor
+# Syslog Monitor
 
 This repository provides a simple Python script to monitor syslog files and trigger alerts when certain events occur too frequently.
 
