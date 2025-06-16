@@ -3,7 +3,10 @@ services:
   syslogger:
     build: .
     container_name: syslogger
-    network_mode: host
+    ports:
+      - "514:514/tcp"
+      - "514:514/udp"
+      - "8080:8080"
     volumes:
       - ./logs:/logs
     environment:
