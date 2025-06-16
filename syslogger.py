@@ -25,6 +25,8 @@ WEB_PORT = int(os.getenv('WEB_PORT', '8080'))
 WEB_LOG_LINES = int(os.getenv('WEB_LOG_LINES', '100'))
 DEAUTH_THRESHOLD = int(os.getenv('DEAUTH_THRESHOLD', '3'))
 AUTH_FAIL_THRESHOLD = int(os.getenv('AUTH_FAIL_THRESHOLD', '5'))
+PORT_SCAN_THRESHOLD = int(os.getenv('PORT_SCAN_THRESHOLD', '10'))
+DHCP_REQ_THRESHOLD = int(os.getenv('DHCP_REQ_THRESHOLD', '20'))
 
 # Ensure log directory exists
 os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
@@ -132,6 +134,8 @@ def analyze_logs():
 
     deauth_map = {}
     auth_map = {}
+    portscan_map = {}
+    dhcp_map = {}
 
     for line in lines:
         lower = line.lower()
@@ -150,7 +154,20 @@ def analyze_logs():
             key = ip or 'unknown'
             auth_map[key] = auth_map.get(key, 0) + 1
         if 'syn flood' in lower or 'port scan' in lower or 'attack' in lower:
+            ip = None
+            m = re.search(r'(\d+\.){3}\d+', line)
+            if m:
+                ip = m.group()
+            key = ip or 'unknown'
+            portscan_map[key] = portscan_map.get(key, 0) + 1
             alerts.append(('Possible Attack', line.strip()))
+        if 'dhcp' in lower and ('discover' in lower or 'request' in lower):
+            mac = None
+            m = re.search(r'([0-9a-f]{2}:){5}[0-9a-f]{2}', lower)
+            if m:
+                mac = m.group()
+            key = mac or 'unknown'
+            dhcp_map[key] = dhcp_map.get(key, 0) + 1
 
     for mac, count in deauth_map.items():
         if count >= DEAUTH_THRESHOLD:
@@ -158,6 +175,12 @@ def analyze_logs():
     for ip, count in auth_map.items():
         if count >= AUTH_FAIL_THRESHOLD:
             alerts.append(('Auth Brute Force', f'{ip} failed {count} times'))
+    for ip, count in portscan_map.items():
+        if count >= PORT_SCAN_THRESHOLD:
+            alerts.append(('Port Scans', f'{ip} seen {count} times'))
+    for mac, count in dhcp_map.items():
+        if count >= DHCP_REQ_THRESHOLD:
+            alerts.append(('DHCP Flood', f'{mac} seen {count} times'))
 
     return alerts
 
@@ -180,8 +203,9 @@ def get_filtered_logs(query=None, num=1000):
     except Exception:
         return []
     if query:
-        query_lower = query.lower()
-        lines = [l for l in lines if query_lower in l.lower()]
+        keywords = [kw.lower() for kw in query.split() if kw]
+        for kw in keywords:
+            lines = [l for l in lines if kw in l.lower()]
     return [line.strip() for line in lines]
 
 

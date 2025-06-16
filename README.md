@@ -14,6 +14,8 @@ SysLogger is a lightweight, containerized syslog server designed to receive and 
 - Modern web interface that highlights potential attacks and displays recent logs
 - Built-in log viewer with search and download options
 - Detects repeated deauthentication and authentication failures to flag possible brute-force attacks
+- Flags port scans and DHCP floods with configurable thresholds
+- Log viewer supports filtering by multiple keywords
 
 ## Usage
 
@@ -32,8 +34,9 @@ SysLogger is a lightweight, containerized syslog server designed to receive and 
 
 3. Check `logs/syslog.log` for incoming messages or open the web dashboard at
    `http://<docker-host>:8080`.
-   The log viewer is available at `http://<docker-host>:8080/logs` and offers a
-   search box and download link.
+  The log viewer is available at `http://<docker-host>:8080/logs` and offers a
+  search box and download link. Enter multiple keywords separated by spaces to
+  narrow the results.
 
 ### Environment Variables
 
@@ -51,6 +54,8 @@ SysLogger is a lightweight, containerized syslog server designed to receive and 
 - `WEB_LOG_LINES` – number of log lines to display in the web interface (default `100`)
 - `DEAUTH_THRESHOLD` – number of deauthentication events from a client before an alert (default `3`)
 - `AUTH_FAIL_THRESHOLD` – number of authentication failures from an IP before an alert (default `5`)
+- `PORT_SCAN_THRESHOLD` – port scan events from an IP before an alert (default `10`)
+- `DHCP_REQ_THRESHOLD` – DHCP requests from a client before an alert (default `20`)
 
 ## Example
 
