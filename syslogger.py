@@ -2,7 +2,7 @@
 import os
 import logging
 import logging.handlers
-from flask import Flask, render_template_string
+from flask import Flask, render_template_string, request, send_file
 import socketserver
 import threading
 import time
@@ -84,6 +84,42 @@ INDEX_TEMPLATE = """
 </html>
 """
 
+LOG_TEMPLATE = """
+<!doctype html>
+<html lang=\"en\">
+<head>
+  <meta charset=\"utf-8\">
+  <title>SysLogger Logs</title>
+  <style>
+    body {font-family: Arial, Helvetica, sans-serif; margin:0; background:#f5f5f5;}
+    header {background:#2c3e50; color:#fff; padding:20px 0; text-align:center;}
+    .container {max-width:800px; margin:20px auto; padding:20px; background:#fff;
+        box-shadow:0 2px 4px rgba(0,0,0,0.1); border-radius:4px;}
+    .log {background:#fafafa; padding:10px; height:400px; overflow-y:auto; font-family:monospace; border:1px solid #ddd;}
+    form {margin-bottom:10px;}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>SysLogger Logs</h1>
+  </header>
+  <div class=\"container\">
+    <form method=\"get\" action=\"/logs\">
+      <input type=\"text\" name=\"q\" value=\"{{ q }}\" placeholder=\"Filter text\"/>
+      <button type=\"submit\">Search</button>
+      <a href=\"/download\">Download</a>
+    </form>
+    <div class=\"log\">
+    {% for line in logs %}
+      {{ line }}<br>
+    {% endfor %}
+    </div>
+    <p><a href=\"/\">Back to Dashboard</a></p>
+  </div>
+</body>
+</html>
+"""
+
 def analyze_logs():
     alerts = []
     if not os.path.exists(LOG_FILE):
@@ -135,12 +171,39 @@ def get_recent_logs(num=WEB_LOG_LINES):
         return []
     return [line.strip() for line in lines]
 
+def get_filtered_logs(query=None, num=1000):
+    if not os.path.exists(LOG_FILE):
+        return []
+    try:
+        with open(LOG_FILE, 'r') as f:
+            lines = f.readlines()[-num:]
+    except Exception:
+        return []
+    if query:
+        query_lower = query.lower()
+        lines = [l for l in lines if query_lower in l.lower()]
+    return [line.strip() for line in lines]
+
 
 @app.route('/')
 def index():
     alerts = analyze_logs()
     logs = get_recent_logs()
     return render_template_string(INDEX_TEMPLATE, alerts=alerts, logs=logs)
+
+
+@app.route('/logs')
+def view_logs():
+    query = request.args.get('q', '')
+    logs = get_filtered_logs(query)
+    return render_template_string(LOG_TEMPLATE, logs=logs, q=query)
+
+
+@app.route('/download')
+def download_logs():
+    if os.path.exists(LOG_FILE):
+        return send_file(LOG_FILE, as_attachment=True)
+    return 'Log file not found', 404
 
 if LOG_TO_STDOUT:
     stream_handler = logging.StreamHandler()
