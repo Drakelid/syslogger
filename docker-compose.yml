@@ -3,6 +3,7 @@ services:
   syslogger:
     build: .
     container_name: syslogger
+      DB_FILE: /logs/syslog.db
     ports:
       - "514:514/tcp"
       - "514:514/udp"

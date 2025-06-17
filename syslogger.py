@@ -7,6 +7,7 @@ import socketserver
 import threading
 import time
 import re
+import sqlite3
 
 LOG_FILE = os.getenv('LOG_FILE', '/logs/syslog.log')
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
@@ -27,9 +28,11 @@ DEAUTH_THRESHOLD = int(os.getenv('DEAUTH_THRESHOLD', '3'))
 AUTH_FAIL_THRESHOLD = int(os.getenv('AUTH_FAIL_THRESHOLD', '5'))
 PORT_SCAN_THRESHOLD = int(os.getenv('PORT_SCAN_THRESHOLD', '10'))
 DHCP_REQ_THRESHOLD = int(os.getenv('DHCP_REQ_THRESHOLD', '20'))
+DB_FILE = os.getenv('DB_FILE', '/logs/syslog.db')
 
 # Ensure log directory exists
 os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+os.makedirs(os.path.dirname(DB_FILE), exist_ok=True)
 
 logger = logging.getLogger('syslogger')
 logger.setLevel(LOG_LEVEL)
@@ -41,6 +44,22 @@ file_handler = logging.handlers.RotatingFileHandler(
 )
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
+
+# SQLite setup
+db_conn = sqlite3.connect(DB_FILE, check_same_thread=False)
+db_conn.execute(
+    "CREATE TABLE IF NOT EXISTS logs (timestamp TEXT, host TEXT, message TEXT)"
+)
+
+def insert_log(ts, host, message):
+    try:
+        db_conn.execute(
+            "INSERT INTO logs (timestamp, host, message) VALUES (?, ?, ?)",
+            (ts, host, message),
+        )
+        db_conn.commit()
+    except Exception as e:
+        logger.error(f"DB insert failed: {e}")
 
 # Web interface setup
 app = Flask(__name__)
@@ -124,11 +143,11 @@ LOG_TEMPLATE = """
 
 def analyze_logs():
     alerts = []
-    if not os.path.exists(LOG_FILE):
-        return alerts
     try:
-        with open(LOG_FILE, 'r') as f:
-            lines = f.readlines()[-1000:]
+        cur = db_conn.cursor()
+        cur.execute("SELECT message FROM logs ORDER BY rowid DESC LIMIT 1000")
+        rows = cur.fetchall()
+        lines = [r[0] for r in rows]
     except Exception:
         return alerts
 
@@ -185,28 +204,35 @@ def analyze_logs():
     return alerts
 
 def get_recent_logs(num=WEB_LOG_LINES):
-    if not os.path.exists(LOG_FILE):
-        return []
     try:
-        with open(LOG_FILE, 'r') as f:
-            lines = f.readlines()[-num:]
+        cur = db_conn.cursor()
+        cur.execute(
+            "SELECT timestamp, host, message FROM logs ORDER BY rowid DESC LIMIT ?",
+            (num,),
+        )
+        rows = cur.fetchall()
     except Exception:
         return []
-    return [line.strip() for line in lines]
+    return [f"{ts} {host} {msg}" for ts, host, msg in reversed(rows)]
 
 def get_filtered_logs(query=None, num=1000):
-    if not os.path.exists(LOG_FILE):
-        return []
     try:
-        with open(LOG_FILE, 'r') as f:
-            lines = f.readlines()[-num:]
+        cur = db_conn.cursor()
+        base = "SELECT timestamp, host, message FROM logs"
+        params = []
+        if query:
+            keywords = [kw.lower() for kw in query.split() if kw]
+            if keywords:
+                conditions = " AND ".join(["LOWER(message) LIKE ?"] * len(keywords))
+                base += " WHERE " + conditions
+                params.extend([f"%{kw}%" for kw in keywords])
+        base += " ORDER BY rowid DESC LIMIT ?"
+        params.append(num)
+        cur.execute(base, params)
+        rows = cur.fetchall()
     except Exception:
         return []
-    if query:
-        keywords = [kw.lower() for kw in query.split() if kw]
-        for kw in keywords:
-            lines = [l for l in lines if kw in l.lower()]
-    return [line.strip() for line in lines]
+    return [f"{ts} {host} {msg}" for ts, host, msg in reversed(rows)]
 
 
 @app.route('/')
@@ -246,12 +272,18 @@ if FORWARD_HOST and FORWARD_PORT:
 class SyslogUDPHandler(socketserver.BaseRequestHandler):
     def handle(self):
         data = bytes.decode(self.request[0].strip())
-        logger.info(f"{self.client_address[0]} {data}")
+        ts = time.strftime('%Y-%m-%d %H:%M:%S')
+        host = self.client_address[0]
+        insert_log(ts, host, data)
+        logger.info(f"{host} {data}")
 
 class SyslogTCPHandler(socketserver.StreamRequestHandler):
     def handle(self):
         data = self.rfile.readline().strip().decode()
-        logger.info(f"{self.client_address[0]} {data}")
+        ts = time.strftime('%Y-%m-%d %H:%M:%S')
+        host = self.client_address[0]
+        insert_log(ts, host, data)
+        logger.info(f"{host} {data}")
 
 
 def run_udp_server(host=BIND_HOST, port=UDP_PORT):

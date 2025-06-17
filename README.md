@@ -9,6 +9,7 @@ SysLogger is a lightweight, containerized syslog server designed to receive and 
 - Minimal configuration, plug-and-play setup
 - Supports UDP and TCP log forwarding
 - Logs are written to a file and can be forwarded to another syslog server
+- Logs are also stored in a local SQLite database for easy searching
 - Automatic log rotation with configurable size and retention
 - Optional logging to STDOUT for debugging
 - Modern web interface that highlights potential attacks and displays recent logs
@@ -32,11 +33,11 @@ SysLogger is a lightweight, containerized syslog server designed to receive and 
    networking, the router can send logs directly to the host IP without any
    extra port mappings.
 
-3. Check `logs/syslog.log` for incoming messages or open the web dashboard at
-   `http://<docker-host>:8080`.
-  The log viewer is available at `http://<docker-host>:8080/logs` and offers a
-  search box and download link. Enter multiple keywords separated by spaces to
-  narrow the results.
+3. Check `logs/syslog.log` or the SQLite database `logs/syslog.db` for incoming
+   messages, or open the web dashboard at `http://<docker-host>:8080`.
+   The log viewer is available at `http://<docker-host>:8080/logs` and offers a
+   search box and download link. Enter multiple keywords separated by spaces to
+   narrow the results.
 
 ### Environment Variables
 
@@ -56,6 +57,7 @@ SysLogger is a lightweight, containerized syslog server designed to receive and 
 - `AUTH_FAIL_THRESHOLD` – number of authentication failures from an IP before an alert (default `5`)
 - `PORT_SCAN_THRESHOLD` – port scan events from an IP before an alert (default `10`)
 - `DHCP_REQ_THRESHOLD` – DHCP requests from a client before an alert (default `20`)
+- `DB_FILE` – path to the SQLite database (`/logs/syslog.db` by default)
 
 ## Example
 
