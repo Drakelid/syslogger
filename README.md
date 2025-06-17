@@ -17,6 +17,7 @@ SysLogger is a lightweight, containerized syslog server designed to receive and 
 - Built-in log viewer with search and download options
 - Detects repeated deauthentication and authentication failures to flag possible brute-force attacks
 - Flags port scans and DHCP floods with configurable thresholds
+- Highlights firewall drops and possible DoS patterns with additional thresholds
 - Detection looks at recent logs within a time window for more accurate alerts
 - Log viewer supports filtering by multiple keywords
 
@@ -60,6 +61,8 @@ SysLogger is a lightweight, containerized syslog server designed to receive and 
 - `AUTH_FAIL_THRESHOLD` – number of authentication failures from an IP before an alert (default `5`)
 - `PORT_SCAN_THRESHOLD` – port scan events from an IP before an alert (default `10`)
 - `DHCP_REQ_THRESHOLD` – DHCP requests from a client before an alert (default `20`)
+- `FIREWALL_THRESHOLD` – firewall drop messages from an IP before an alert (default `20`)
+- `DOS_THRESHOLD` – DoS related messages from an IP before an alert (default `10`)
 - `DB_FILE` – path to the SQLite database (`/logs/syslog.db` by default)
 - `DETECTION_WINDOW` – seconds of recent logs considered for attack detection (default `600`)
 

@@ -28,6 +28,8 @@ DEAUTH_THRESHOLD = int(os.getenv('DEAUTH_THRESHOLD', '3'))
 AUTH_FAIL_THRESHOLD = int(os.getenv('AUTH_FAIL_THRESHOLD', '5'))
 PORT_SCAN_THRESHOLD = int(os.getenv('PORT_SCAN_THRESHOLD', '10'))
 DHCP_REQ_THRESHOLD = int(os.getenv('DHCP_REQ_THRESHOLD', '20'))
+FIREWALL_THRESHOLD = int(os.getenv('FIREWALL_THRESHOLD', '20'))
+DOS_THRESHOLD = int(os.getenv('DOS_THRESHOLD', '10'))
 DB_FILE = os.getenv('DB_FILE', '/logs/syslog.db')
 DETECTION_WINDOW = int(os.getenv('DETECTION_WINDOW', '600'))  # seconds
 
@@ -108,6 +110,8 @@ INDEX_TEMPLATE = """
       <tr><th>Auth Failures</th><td>{{ stats.auth_fail }}</td></tr>
       <tr><th>Port Scans</th><td>{{ stats.port_scan }}</td></tr>
       <tr><th>DHCP Requests</th><td>{{ stats.dhcp }}</td></tr>
+      <tr><th>Firewall Drops</th><td>{{ stats.firewall }}</td></tr>
+      <tr><th>DoS Alerts</th><td>{{ stats.dos }}</td></tr>
     </table>
 
     <h2>Detected Events</h2>
@@ -172,6 +176,8 @@ def analyze_logs():
         "auth_fail": 0,
         "port_scan": 0,
         "dhcp": 0,
+        "firewall": 0,
+        "dos": 0,
     }
     cutoff = time.strftime(
         "%Y-%m-%d %H:%M:%S",
@@ -192,12 +198,16 @@ def analyze_logs():
     auth_map = {}
     portscan_map = {}
     dhcp_map = {}
+    firewall_map = {}
+    dos_map = {}
 
     deauth_re = re.compile(r"deauth\w*.*?((?:[0-9a-f]{2}:){5}[0-9a-f]{2})", re.I)
     deauth_alt = re.compile(r"deauthenticated.*?((?:[0-9a-f]{2}:){5}[0-9a-f]{2})", re.I)
     auth_re = re.compile(r"failed (?:login|password).*from ([0-9.]+)", re.I)
     port_re = re.compile(r"(?:syn flood|port scan).*from ([0-9.]+)", re.I)
     dhcp_re = re.compile(r"dhcp(?:discover|request).*?((?:[0-9a-f]{2}:){5}[0-9a-f]{2})", re.I)
+    firewall_re = re.compile(r"(?:DENY|DROP).*SRC=([0-9.]+)", re.I)
+    dos_re = re.compile(r"(?:ddos|dos attack|syn flood).*from ([0-9.]+)", re.I)
 
     for line in lines:
         if deauth_re.search(line) or deauth_alt.search(line):
@@ -217,6 +227,14 @@ def analyze_logs():
         if m:
             mac = m.group(1).lower()
             dhcp_map[mac] = dhcp_map.get(mac, 0) + 1
+        m = firewall_re.search(line)
+        if m:
+            ip = m.group(1)
+            firewall_map[ip] = firewall_map.get(ip, 0) + 1
+        m = dos_re.search(line)
+        if m:
+            ip = m.group(1)
+            dos_map[ip] = dos_map.get(ip, 0) + 1
 
     for mac, count in deauth_map.items():
         stats["deauth"] += count
@@ -234,6 +252,14 @@ def analyze_logs():
         stats["dhcp"] += count
         if count >= DHCP_REQ_THRESHOLD:
             alerts.append(("DHCP Flood", f"{mac} seen {count} times"))
+    for ip, count in firewall_map.items():
+        stats["firewall"] += count
+        if count >= FIREWALL_THRESHOLD:
+            alerts.append(("Firewall Drops", f"{ip} seen {count} times"))
+    for ip, count in dos_map.items():
+        stats["dos"] += count
+        if count >= DOS_THRESHOLD:
+            alerts.append(("Possible DoS", f"{ip} seen {count} times"))
 
     return alerts, stats
 

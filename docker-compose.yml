@@ -3,6 +3,8 @@ services:
   syslogger:
     build: .
     container_name: syslogger
+      FIREWALL_THRESHOLD: 20
+      DOS_THRESHOLD: 10
       DB_FILE: /logs/syslog.db
       DETECTION_WINDOW: 600
     ports:
