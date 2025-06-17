@@ -88,32 +88,39 @@ INDEX_TEMPLATE = """
 <head>
   <meta charset=\"utf-8\">
   <title>SysLogger Dashboard</title>
+  <link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css\">
   <style>
-    body {font-family: Arial, Helvetica, sans-serif; margin:0; background:#f5f5f5;}
-    header {background:#2c3e50; color:#fff; padding:20px 0; text-align:center;}
-    .container {max-width:800px; margin:20px auto; padding:20px; background:#fff;
-        box-shadow:0 2px 4px rgba(0,0,0,0.1); border-radius:4px;}
-    .alert {background:#f8d7da; border-left:4px solid #c0392b; padding:10px; margin-bottom:10px;}
-    .log {background:#fafafa; padding:10px; height:300px; overflow-y:auto; font-family:monospace; border:1px solid #ddd;}
-    h2 {border-bottom:1px solid #eee; padding-bottom:4px; margin-top:20px;}
+    body {padding-top:4rem;}
+    .log-box {height:300px; overflow-y:auto; font-family:monospace;}
   </style>
 </head>
 <body>
-  <header>
-    <h1>SysLogger Dashboard</h1>
-  </header>
-  <div class=\"container\">
+  <nav class=\"navbar navbar-dark bg-dark fixed-top\">
+    <div class=\"container-fluid\">
+      <a class=\"navbar-brand\" href=\"/\">SysLogger</a>
+      <a class=\"btn btn-secondary\" href=\"/logs\">View Logs</a>
+    </div>
+  </nav>
+  <div class=\"container mt-4\">
+    <h2>Attack Statistics</h2>
+    <table class=\"table table-sm\">
+      <tr><th>Deauth Events</th><td>{{ stats.deauth }}</td></tr>
+      <tr><th>Auth Failures</th><td>{{ stats.auth_fail }}</td></tr>
+      <tr><th>Port Scans</th><td>{{ stats.port_scan }}</td></tr>
+      <tr><th>DHCP Requests</th><td>{{ stats.dhcp }}</td></tr>
+    </table>
+
     <h2>Detected Events</h2>
     {% if alerts %}
       {% for a in alerts %}
-        <div class=\"alert\"><strong>{{ a[0] }}:</strong> {{ a[1] }}</div>
+        <div class=\"alert alert-danger mb-2\"><strong>{{ a[0] }}:</strong> {{ a[1] }}</div>
       {% endfor %}
     {% else %}
       <p>No suspicious activity detected.</p>
     {% endif %}
 
     <h2>Recent Logs</h2>
-    <div class=\"log\">
+    <div class=\"log-box border rounded p-2 bg-light\">
     {% for line in logs %}
       {{ line }}<br>
     {% endfor %}
@@ -129,31 +136,30 @@ LOG_TEMPLATE = """
 <head>
   <meta charset=\"utf-8\">
   <title>SysLogger Logs</title>
+  <link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css\">
   <style>
-    body {font-family: Arial, Helvetica, sans-serif; margin:0; background:#f5f5f5;}
-    header {background:#2c3e50; color:#fff; padding:20px 0; text-align:center;}
-    .container {max-width:800px; margin:20px auto; padding:20px; background:#fff;
-        box-shadow:0 2px 4px rgba(0,0,0,0.1); border-radius:4px;}
-    .log {background:#fafafa; padding:10px; height:400px; overflow-y:auto; font-family:monospace; border:1px solid #ddd;}
-    form {margin-bottom:10px;}
+    body {padding-top:4rem;}
+    .log-box {height:400px; overflow-y:auto; font-family:monospace;}
   </style>
 </head>
 <body>
-  <header>
-    <h1>SysLogger Logs</h1>
-  </header>
-  <div class=\"container\">
-    <form method=\"get\" action=\"/logs\">
-      <input type=\"text\" name=\"q\" value=\"{{ q }}\" placeholder=\"Filter text\"/>
-      <button type=\"submit\">Search</button>
-      <a href=\"/download\">Download</a>
+  <nav class=\"navbar navbar-dark bg-dark fixed-top\">
+    <div class=\"container-fluid\">
+      <a class=\"navbar-brand\" href=\"/\">SysLogger</a>
+    </div>
+  </nav>
+  <div class=\"container mt-4\">
+    <form method=\"get\" action=\"/logs\" class=\"d-flex mb-3\">
+      <input type=\"text\" class=\"form-control me-2\" name=\"q\" value=\"{{ q }}\" placeholder=\"Filter text\"/>
+      <button type=\"submit\" class=\"btn btn-primary me-2\">Search</button>
+      <a class=\"btn btn-secondary\" href=\"/download\">Download</a>
     </form>
-    <div class=\"log\">
+    <div class=\"log-box border rounded p-2 bg-light\">
     {% for line in logs %}
       {{ line }}<br>
     {% endfor %}
     </div>
-    <p><a href=\"/\">Back to Dashboard</a></p>
+    <p class=\"mt-3\"><a href=\"/\">Back to Dashboard</a></p>
   </div>
 </body>
 </html>
@@ -161,6 +167,12 @@ LOG_TEMPLATE = """
 
 def analyze_logs():
     alerts = []
+    stats = {
+        "deauth": 0,
+        "auth_fail": 0,
+        "port_scan": 0,
+        "dhcp": 0,
+    }
     cutoff = time.strftime(
         "%Y-%m-%d %H:%M:%S",
         time.localtime(time.time() - DETECTION_WINDOW),
@@ -174,7 +186,7 @@ def analyze_logs():
         rows = cur.fetchall()
         lines = [r[0] for r in rows]
     except Exception:
-        return alerts
+        return alerts, stats
 
     deauth_map = {}
     auth_map = {}
@@ -207,19 +219,23 @@ def analyze_logs():
             dhcp_map[mac] = dhcp_map.get(mac, 0) + 1
 
     for mac, count in deauth_map.items():
+        stats["deauth"] += count
         if count >= DEAUTH_THRESHOLD:
             alerts.append(("Deauth Flood", f"{mac} seen {count} times"))
     for ip, count in auth_map.items():
+        stats["auth_fail"] += count
         if count >= AUTH_FAIL_THRESHOLD:
             alerts.append(("Auth Brute Force", f"{ip} failed {count} times"))
     for ip, count in portscan_map.items():
+        stats["port_scan"] += count
         if count >= PORT_SCAN_THRESHOLD:
             alerts.append(("Port Scans", f"{ip} seen {count} times"))
     for mac, count in dhcp_map.items():
+        stats["dhcp"] += count
         if count >= DHCP_REQ_THRESHOLD:
             alerts.append(("DHCP Flood", f"{mac} seen {count} times"))
 
-    return alerts
+    return alerts, stats
 
 def get_recent_logs(num=WEB_LOG_LINES):
     try:
@@ -255,9 +271,9 @@ def get_filtered_logs(query=None, num=1000):
 
 @app.route('/')
 def index():
-    alerts = analyze_logs()
+    alerts, stats = analyze_logs()
     logs = get_recent_logs()
-    return render_template_string(INDEX_TEMPLATE, alerts=alerts, logs=logs)
+    return render_template_string(INDEX_TEMPLATE, alerts=alerts, logs=logs, stats=stats)
 
 
 @app.route('/logs')

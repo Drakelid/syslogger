@@ -13,6 +13,7 @@ SysLogger is a lightweight, containerized syslog server designed to receive and 
 - Automatic log rotation with configurable size and retention
 - Optional logging to STDOUT for debugging
 - Modern web interface that highlights potential attacks and displays recent logs
+- Dashboard shows attack statistics for quick insight
 - Built-in log viewer with search and download options
 - Detects repeated deauthentication and authentication failures to flag possible brute-force attacks
 - Flags port scans and DHCP floods with configurable thresholds
@@ -36,7 +37,8 @@ SysLogger is a lightweight, containerized syslog server designed to receive and 
 
 3. Check `logs/syslog.log` or the SQLite database `logs/syslog.db` for incoming
    messages, or open the web dashboard at `http://<docker-host>:8080`.
-   The log viewer is available at `http://<docker-host>:8080/logs` and offers a
+   The dashboard shows attack statistics and recent alerts. The log viewer is
+   available at `http://<docker-host>:8080/logs` and offers a
    search box and download link. Enter multiple keywords separated by spaces to
    narrow the results.
 
