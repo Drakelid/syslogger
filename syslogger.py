@@ -29,6 +29,7 @@ AUTH_FAIL_THRESHOLD = int(os.getenv('AUTH_FAIL_THRESHOLD', '5'))
 PORT_SCAN_THRESHOLD = int(os.getenv('PORT_SCAN_THRESHOLD', '10'))
 DHCP_REQ_THRESHOLD = int(os.getenv('DHCP_REQ_THRESHOLD', '20'))
 DB_FILE = os.getenv('DB_FILE', '/logs/syslog.db')
+DETECTION_WINDOW = int(os.getenv('DETECTION_WINDOW', '600'))  # seconds
 
 # Ensure log directory exists
 os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
@@ -50,6 +51,23 @@ db_conn = sqlite3.connect(DB_FILE, check_same_thread=False)
 db_conn.execute(
     "CREATE TABLE IF NOT EXISTS logs (timestamp TEXT, host TEXT, message TEXT)"
 )
+
+SYSLOG_RE = re.compile(r"(?:<\d+>)?(\w{3}\s+\d+\s+\d+:\d+:\d+)\s+(\S+)\s+(.*)")
+
+
+def parse_syslog_message(raw, client_host):
+    match = SYSLOG_RE.match(raw)
+    if match:
+        ts_part, host, msg = match.groups()
+        try:
+            struct = time.strptime(
+                f"{time.localtime().tm_year} {ts_part}", "%Y %b %d %H:%M:%S"
+            )
+            ts = time.strftime("%Y-%m-%d %H:%M:%S", struct)
+        except Exception:
+            ts = time.strftime("%Y-%m-%d %H:%M:%S")
+        return ts, host, msg
+    return time.strftime("%Y-%m-%d %H:%M:%S"), client_host, raw
 
 def insert_log(ts, host, message):
     try:
@@ -143,9 +161,16 @@ LOG_TEMPLATE = """
 
 def analyze_logs():
     alerts = []
+    cutoff = time.strftime(
+        "%Y-%m-%d %H:%M:%S",
+        time.localtime(time.time() - DETECTION_WINDOW),
+    )
     try:
         cur = db_conn.cursor()
-        cur.execute("SELECT message FROM logs ORDER BY rowid DESC LIMIT 1000")
+        cur.execute(
+            "SELECT message FROM logs WHERE timestamp >= ? ORDER BY rowid DESC",
+            (cutoff,),
+        )
         rows = cur.fetchall()
         lines = [r[0] for r in rows]
     except Exception:
@@ -156,50 +181,43 @@ def analyze_logs():
     portscan_map = {}
     dhcp_map = {}
 
+    deauth_re = re.compile(r"deauth\w*.*?((?:[0-9a-f]{2}:){5}[0-9a-f]{2})", re.I)
+    deauth_alt = re.compile(r"deauthenticated.*?((?:[0-9a-f]{2}:){5}[0-9a-f]{2})", re.I)
+    auth_re = re.compile(r"failed (?:login|password).*from ([0-9.]+)", re.I)
+    port_re = re.compile(r"(?:syn flood|port scan).*from ([0-9.]+)", re.I)
+    dhcp_re = re.compile(r"dhcp(?:discover|request).*?((?:[0-9a-f]{2}:){5}[0-9a-f]{2})", re.I)
+
     for line in lines:
-        lower = line.lower()
-        if 'deauth' in lower or 'disassoc' in lower:
-            mac = None
-            m = re.search(r'([0-9a-f]{2}:){5}[0-9a-f]{2}', lower)
-            if m:
-                mac = m.group()
-            key = mac or 'unknown'
-            deauth_map[key] = deauth_map.get(key, 0) + 1
-        if 'failed password' in lower or 'authentication failure' in lower:
-            ip = None
-            m = re.search(r'(\d+\.){3}\d+', line)
-            if m:
-                ip = m.group()
-            key = ip or 'unknown'
-            auth_map[key] = auth_map.get(key, 0) + 1
-        if 'syn flood' in lower or 'port scan' in lower or 'attack' in lower:
-            ip = None
-            m = re.search(r'(\d+\.){3}\d+', line)
-            if m:
-                ip = m.group()
-            key = ip or 'unknown'
-            portscan_map[key] = portscan_map.get(key, 0) + 1
-            alerts.append(('Possible Attack', line.strip()))
-        if 'dhcp' in lower and ('discover' in lower or 'request' in lower):
-            mac = None
-            m = re.search(r'([0-9a-f]{2}:){5}[0-9a-f]{2}', lower)
-            if m:
-                mac = m.group()
-            key = mac or 'unknown'
-            dhcp_map[key] = dhcp_map.get(key, 0) + 1
+        if deauth_re.search(line) or deauth_alt.search(line):
+            m = re.search(r"([0-9a-f]{2}:){5}[0-9a-f]{2}", line, re.I)
+            mac = m.group().lower() if m else "unknown"
+            deauth_map[mac] = deauth_map.get(mac, 0) + 1
+        m = auth_re.search(line)
+        if m:
+            ip = m.group(1)
+            auth_map[ip] = auth_map.get(ip, 0) + 1
+        m = port_re.search(line)
+        if m:
+            ip = m.group(1)
+            portscan_map[ip] = portscan_map.get(ip, 0) + 1
+            alerts.append(("Possible Attack", line.strip()))
+        m = dhcp_re.search(line)
+        if m:
+            mac = m.group(1).lower()
+            dhcp_map[mac] = dhcp_map.get(mac, 0) + 1
 
     for mac, count in deauth_map.items():
         if count >= DEAUTH_THRESHOLD:
-            alerts.append(('Deauth Flood', f'{mac} seen {count} times'))
+            alerts.append(("Deauth Flood", f"{mac} seen {count} times"))
     for ip, count in auth_map.items():
         if count >= AUTH_FAIL_THRESHOLD:
-            alerts.append(('Auth Brute Force', f'{ip} failed {count} times'))
+            alerts.append(("Auth Brute Force", f"{ip} failed {count} times"))
     for ip, count in portscan_map.items():
         if count >= PORT_SCAN_THRESHOLD:
-            alerts.append(('Port Scans', f'{ip} seen {count} times'))
+            alerts.append(("Port Scans", f"{ip} seen {count} times"))
     for mac, count in dhcp_map.items():
         if count >= DHCP_REQ_THRESHOLD:
-            alerts.append(('DHCP Flood', f'{mac} seen {count} times'))
+            alerts.append(("DHCP Flood", f"{mac} seen {count} times"))
 
     return alerts
 
@@ -271,19 +289,17 @@ if FORWARD_HOST and FORWARD_PORT:
 
 class SyslogUDPHandler(socketserver.BaseRequestHandler):
     def handle(self):
-        data = bytes.decode(self.request[0].strip())
-        ts = time.strftime('%Y-%m-%d %H:%M:%S')
-        host = self.client_address[0]
-        insert_log(ts, host, data)
-        logger.info(f"{host} {data}")
+        data = bytes.decode(self.request[0].strip(), errors="ignore")
+        ts, host, msg = parse_syslog_message(data, self.client_address[0])
+        insert_log(ts, host, msg)
+        logger.info(f"{host} {msg}")
 
 class SyslogTCPHandler(socketserver.StreamRequestHandler):
     def handle(self):
-        data = self.rfile.readline().strip().decode()
-        ts = time.strftime('%Y-%m-%d %H:%M:%S')
-        host = self.client_address[0]
-        insert_log(ts, host, data)
-        logger.info(f"{host} {data}")
+        data = self.rfile.readline().strip().decode(errors="ignore")
+        ts, host, msg = parse_syslog_message(data, self.client_address[0])
+        insert_log(ts, host, msg)
+        logger.info(f"{host} {msg}")
 
 
 def run_udp_server(host=BIND_HOST, port=UDP_PORT):
