@@ -1,0 +1,13 @@
+[Unit]
+Description=SysLogger
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/syslogger
+EnvironmentFile=/opt/syslogger/syslogger.env
+ExecStart=/usr/bin/python3 /opt/syslogger/syslogger.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

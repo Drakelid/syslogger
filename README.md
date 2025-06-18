@@ -1,10 +1,10 @@
 # SysLogger
 
-SysLogger is a lightweight, containerized syslog server designed to receive and manage system logs from ASUS routers. Running in a Docker environment, it captures, stores and optionally forwards syslog messages for diagnostics, monitoring and auditing purposes.
+SysLogger is a lightweight, containerized syslog server designed to receive and manage system logs from ASUS routers. Running in a Proxmox LXC container, it captures, stores and optionally forwards syslog messages for diagnostics, monitoring and auditing purposes.
 
 ## Features
 
-- Runs as a standalone syslog server in a Docker container
+- Runs as a standalone syslog server in a Proxmox LXC container
 - Optimized for ASUS router syslog output (e.g. RT-AX88U, RT-AC86U)
 - Minimal configuration, plug-and-play setup
 - Supports UDP and TCP log forwarding
@@ -23,29 +23,39 @@ SysLogger is a lightweight, containerized syslog server designed to receive and 
 
 ## Usage
 
-1. Build and start the container using Docker Compose. The configuration
-   runs the container with host networking so the syslog and web ports are
-   reachable from other devices on your LAN without additional port mapping:
+1. Create an unprivileged Debian or Ubuntu LXC container in Proxmox and assign it an IP address on your LAN.
+
+2. Log in to the container and install Python and Flask:
+
    ```bash
-   docker-compose up --build
+   apt update
+   apt install -y python3 python3-pip
+   pip3 install flask
    ```
-   Logs will be stored in the `logs/` directory on the host.
 
-2. Point your ASUS router's syslog settings to the IP address of the Docker
-   host on the configured port (default `514`). Because SysLogger uses host
-   networking, the router can send logs directly to the host IP without any
-   extra port mappings.
+3. Clone or copy this project into `/opt/syslogger`:
 
-3. Check `logs/syslog.log` or the SQLite database `logs/syslog.db` for incoming
-   messages, or open the web dashboard at `http://<docker-host>:8080`.
-   The dashboard shows attack statistics and recent alerts. The log viewer is
-   available at `http://<docker-host>:8080/logs` and offers a
-   search box and download link. Enter multiple keywords separated by spaces to
-   narrow the results.
+   ```bash
+   git clone https://github.com/yourname/syslogger.git /opt/syslogger
+   ```
+
+4. Copy `syslogger.service` and `syslogger.env` then start SysLogger:
+
+   ```bash
+   cp /opt/syslogger/syslogger.service /etc/systemd/system/
+   systemctl daemon-reload
+   systemctl enable --now syslogger
+   ```
+   Edit `/opt/syslogger/syslogger.env` to adjust settings.
+
+   Logs will be written to `/opt/syslogger/logs` inside the container.
+
+5. Point your ASUS router's syslog settings to the container IP on port `514` and open `http://<container-ip>:8080` to view the dashboard.
+
 
 ### Environment Variables
 
-- `LOG_FILE` – path to the log file inside the container (`/logs/syslog.log` by default)
+- `LOG_FILE` – path to the log file inside the container (`/opt/syslogger/logs/syslog.log` by default)
 - `LOG_LEVEL` – Python logging level (e.g. `INFO`, `DEBUG`)
 - `FORWARD_HOST` and `FORWARD_PORT` – if set, messages will also be forwarded to another syslog server
 - `MAX_BYTES` – rotate log files when they reach this size (default `10485760`)
@@ -63,19 +73,22 @@ SysLogger is a lightweight, containerized syslog server designed to receive and 
 - `DHCP_REQ_THRESHOLD` – DHCP requests from a client before an alert (default `20`)
 - `FIREWALL_THRESHOLD` – firewall drop messages from an IP before an alert (default `20`)
 - `DOS_THRESHOLD` – DoS related messages from an IP before an alert (default `10`)
-- `DB_FILE` – path to the SQLite database (`/logs/syslog.db` by default)
+- `DB_FILE` – path to the SQLite database (`/opt/syslogger/logs/syslog.db` by default)
 - `DETECTION_WINDOW` – seconds of recent logs considered for attack detection (default `600`)
 
 ## Example
 
-To forward logs to another syslog server at `192.168.1.10:514` while listening on a custom port, run:
+To forward logs to another syslog server at `192.168.1.10:514`, edit `/opt/syslogger/syslogger.env`:
 
 ```bash
-docker-compose run \
-  -e FORWARD_HOST=192.168.1.10 \
-  -e FORWARD_PORT=514 \
-  -e TCP_PORT=1514 \
-  syslogger
+FORWARD_HOST=192.168.1.10
+FORWARD_PORT=514
+```
+
+Reload the service to apply changes:
+
+```bash
+systemctl restart syslogger
 ```
 
 SysLogger provides a simple way to collect and inspect your router logs without additional dependencies.
