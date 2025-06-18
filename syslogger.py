@@ -858,13 +858,43 @@ class SyslogTCPHandler(socketserver.StreamRequestHandler):
 
 
 def run_udp_server(host=BIND_HOST, port=UDP_PORT):
-    with socketserver.ThreadingUDPServer((host, port), SyslogUDPHandler) as server:
-        server.serve_forever()
+    try:
+        logger.info(f"Starting UDP syslog server on {host}:{port}")
+        with socketserver.ThreadingUDPServer((host, port), SyslogUDPHandler) as server:
+            server.serve_forever()
+    except Exception as e:
+        logger.error(f"UDP server failed to start: {str(e)}")
+        # If permission error and port < 1024, try fallback
+        if isinstance(e, PermissionError) and port < 1024:
+            fallback_port = 5140  # Common unprivileged syslog alternative
+            logger.warning(f"Permission error on port {port}, trying fallback port {fallback_port}")
+            try:
+                with socketserver.ThreadingUDPServer((host, fallback_port), SyslogUDPHandler) as server:
+                    logger.info(f"UDP server started on fallback port {fallback_port}")
+                    server.serve_forever()
+            except Exception as e2:
+                logger.error(f"UDP fallback server failed: {str(e2)}")
+        raise
 
 
 def run_tcp_server(host=BIND_HOST, port=TCP_PORT):
-    with socketserver.ThreadingTCPServer((host, port), SyslogTCPHandler) as server:
-        server.serve_forever()
+    try:
+        logger.info(f"Starting TCP syslog server on {host}:{port}")
+        with socketserver.ThreadingTCPServer((host, port), SyslogTCPHandler) as server:
+            server.serve_forever()
+    except Exception as e:
+        logger.error(f"TCP server failed to start: {str(e)}")
+        # If permission error and port < 1024, try fallback
+        if isinstance(e, PermissionError) and port < 1024:
+            fallback_port = 5140  # Common unprivileged syslog alternative
+            logger.warning(f"Permission error on port {port}, trying fallback port {fallback_port}")
+            try:
+                with socketserver.ThreadingTCPServer((host, fallback_port), SyslogTCPHandler) as server:
+                    logger.info(f"TCP server started on fallback port {fallback_port}")
+                    server.serve_forever()
+            except Exception as e2:
+                logger.error(f"TCP fallback server failed: {str(e2)}")
+        raise
 
 
 def run_web_server(host=BIND_HOST, port=WEB_PORT):
@@ -873,16 +903,52 @@ def run_web_server(host=BIND_HOST, port=WEB_PORT):
 
 def main():
     threads = []
+    thread_status = {}
+    
+    # Log environment settings
+    logger.info(f"Starting SysLogger with configuration:")
+    logger.info(f"  UDP: {ENABLE_UDP} (port {UDP_PORT})")
+    logger.info(f"  TCP: {ENABLE_TCP} (port {TCP_PORT})")
+    logger.info(f"  WEB: {ENABLE_WEB} (port {WEB_PORT})")
+    logger.info(f"  BIND_HOST: {BIND_HOST}")
+    logger.info(f"  LOG_FILE: {LOG_FILE}")
+    logger.info(f"  DB_FILE: {DB_FILE}")
+    
+    # Function to wrap thread target with error reporting
+    def thread_wrapper(name, target_func):
+        thread_status[name] = "starting"
+        try:
+            logger.info(f"Thread {name} starting")
+            target_func()
+            thread_status[name] = "running"
+        except Exception as e:
+            thread_status[name] = f"error: {str(e)}"
+            logger.error(f"Thread {name} failed: {str(e)}")
+    
     if ENABLE_UDP:
-        udp_thread = threading.Thread(target=run_udp_server, daemon=True)
+        udp_thread = threading.Thread(
+            target=lambda: thread_wrapper("UDP", run_udp_server),
+            daemon=True,
+            name="UDP_Server"
+        )
         udp_thread.start()
         threads.append(udp_thread)
+        
     if ENABLE_TCP:
-        tcp_thread = threading.Thread(target=run_tcp_server, daemon=True)
+        tcp_thread = threading.Thread(
+            target=lambda: thread_wrapper("TCP", run_tcp_server), 
+            daemon=True,
+            name="TCP_Server"
+        )
         tcp_thread.start()
         threads.append(tcp_thread)
+        
     if ENABLE_WEB:
-        web_thread = threading.Thread(target=run_web_server, daemon=True)
+        web_thread = threading.Thread(
+            target=lambda: thread_wrapper("WEB", run_web_server), 
+            daemon=True,
+            name="Web_Server"
+        )
         web_thread.start()
         threads.append(web_thread)
 
@@ -890,10 +956,23 @@ def main():
         logger.error('No services enabled. Enable UDP, TCP and/or WEB interface.')
         return
 
-    logger.info('SysLogger started')
+    logger.info('SysLogger startup complete')
+    
+    # Wait a bit and log thread status
+    time.sleep(5) 
+    logger.info(f"Thread status after startup:")
+    for name, status in thread_status.items():
+        logger.info(f"  {name}: {status}")
+    
     try:
         while True:
-            time.sleep(1)
+            time.sleep(10)
+            alive_count = sum(1 for t in threads if t.is_alive())
+            if alive_count < len(threads):
+                logger.warning(f"Only {alive_count}/{len(threads)} threads still running")
+                for t in threads:
+                    if not t.is_alive():
+                        logger.error(f"Thread {t.name} died unexpectedly")
     except KeyboardInterrupt:
         logger.info('SysLogger stopping')
 

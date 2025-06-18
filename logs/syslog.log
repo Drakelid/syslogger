@@ -6471,3 +6471,20 @@
 2025-06-18 09:56:25,414 RT-AX57_Go-9AFA-99E9A55-R kernel: found private data block and skip it
 2025-06-18 09:56:25,474 RT-AX57_Go-9AFA-99E9A55-R rc_service: cfg_client 5569:notify_rc restart_logger
 2025-06-18 09:56:25,532 RT-AX57_Go-9AFA-99E9A55-R kernel: _nvram_free: 26704(cfg_client) nvram_idx(0 / 2)
+2025-06-18 14:05:25,117 Starting SysLogger with configuration:
+2025-06-18 14:05:25,118   UDP: True (port 514)
+2025-06-18 14:05:25,119   TCP: True (port 514)
+2025-06-18 14:05:25,120   WEB: True (port 8080)
+2025-06-18 14:05:25,122   BIND_HOST: 0.0.0.0
+2025-06-18 14:05:25,123   LOG_FILE: /logs/syslog.log
+2025-06-18 14:05:25,124   DB_FILE: /logs/syslog.db
+2025-06-18 14:05:25,126 Thread UDP starting
+2025-06-18 14:05:25,126 Thread TCP starting
+2025-06-18 14:05:25,127 Thread WEB starting
+2025-06-18 14:05:25,127 SysLogger startup complete
+2025-06-18 14:05:25,127 Starting UDP syslog server on 0.0.0.0:514
+2025-06-18 14:05:25,129 Starting TCP syslog server on 0.0.0.0:514
+2025-06-18 14:05:30,133 Thread status after startup:
+2025-06-18 14:05:30,134   UDP: starting
+2025-06-18 14:05:30,135   TCP: starting
+2025-06-18 14:05:30,137   WEB: starting
