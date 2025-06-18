@@ -2,12 +2,17 @@
 import os
 import logging
 import logging.handlers
-from flask import Flask, render_template_string, request, send_file
+from flask import Flask, render_template_string, request, send_file, jsonify
 import socketserver
 import threading
 import time
 import re
 import sqlite3
+import socket
+import json
+from datetime import datetime
+import subprocess
+import ipaddress
 
 LOG_FILE = os.getenv('LOG_FILE', '/logs/syslog.log')
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
@@ -53,6 +58,18 @@ db_conn = sqlite3.connect(DB_FILE, check_same_thread=False)
 db_conn.execute(
     "CREATE TABLE IF NOT EXISTS logs (timestamp TEXT, host TEXT, message TEXT)"
 )
+db_conn.execute(
+    """CREATE TABLE IF NOT EXISTS devices (
+        ip TEXT PRIMARY KEY,
+        hostname TEXT,
+        mac TEXT,
+        first_seen TEXT,
+        last_seen TEXT,
+        attack_types TEXT,
+        detection_count INTEGER DEFAULT 0,
+        device_info TEXT
+    )"""
+)
 
 SYSLOG_RE = re.compile(r"(?:<\d+>)?(\w{3}\s+\d+\s+\d+:\d+:\d+)\s+(\S+)\s+(.*)")
 
@@ -70,6 +87,165 @@ def parse_syslog_message(raw, client_host):
             ts = time.strftime("%Y-%m-%d %H:%M:%S")
         return ts, host, msg
     return time.strftime("%Y-%m-%d %H:%M:%S"), client_host, raw
+
+def is_valid_ip(ip):
+    try:
+        ipaddress.ip_address(ip)
+        return True
+    except ValueError:
+        return False
+
+def get_device_hostname(ip):
+    try:
+        if not is_valid_ip(ip):
+            return None
+        hostname, _, _ = socket.gethostbyaddr(ip)
+        return hostname
+    except (socket.herror, socket.gaierror):
+        return None
+
+def get_mac_from_arp(ip):
+    try:
+        if not is_valid_ip(ip):
+            return None
+        # Try to get MAC address from ARP table (requires privileges)
+        try:
+            if os.name == 'posix':  # Linux or macOS
+                cmd = ['arp', '-n', ip]
+                arp_output = subprocess.check_output(cmd).decode('utf-8')
+                for line in arp_output.splitlines():
+                    if ip in line:
+                        parts = line.split()
+                        if len(parts) >= 3:
+                            return parts[2]
+            elif os.name == 'nt':  # Windows
+                cmd = ['arp', '-a', ip]
+                arp_output = subprocess.check_output(cmd).decode('utf-8')
+                for line in arp_output.splitlines():
+                    if ip in line:
+                        parts = line.split()
+                        if len(parts) >= 2:
+                            return parts[1].replace('-', ':')
+        except (subprocess.SubprocessError, IndexError, ValueError):
+            pass
+        return None
+    except Exception as e:
+        logger.debug(f"Error getting MAC address for {ip}: {e}")
+        return None
+
+def gather_device_info(ip, attack_type=None):
+    """
+    Gather as much information as possible about a device given its IP address
+    """
+    if not is_valid_ip(ip):
+        return None
+    
+    info = {}
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    # Get basic network info
+    hostname = get_device_hostname(ip)
+    mac = get_mac_from_arp(ip)
+    
+    # Try to gather more advanced info
+    network_info = {}
+    
+    try:
+        # Use socket to determine if common ports are open, with short timeout
+        socket.setdefaulttimeout(0.5)
+        common_ports = [22, 23, 80, 443, 8080, 21, 25, 53, 3389, 5900]
+        open_ports = []
+        
+        for port in common_ports:
+            try:
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                result = s.connect_ex((ip, port))
+                if result == 0:
+                    open_ports.append(port)
+                s.close()
+            except:
+                pass
+        
+        if open_ports:
+            network_info["open_ports"] = open_ports
+    except Exception as e:
+        logger.debug(f"Error checking ports for {ip}: {e}")
+    
+    # Put everything together
+    info["network_info"] = network_info
+    
+    try:
+        # Check if this device exists in our database
+        cur = db_conn.cursor()
+        cur.execute("SELECT * FROM devices WHERE ip = ?", (ip,))
+        device = cur.fetchone()
+        
+        if device:
+            # Device exists, update information
+            stored_info = json.loads(device[7]) if device[7] else {}
+            stored_attack_types = json.loads(device[5]) if device[5] else []
+            
+            # Merge dictionaries giving precedence to new info
+            for key, value in info.items():
+                if key in stored_info:
+                    if isinstance(value, dict) and isinstance(stored_info[key], dict):
+                        stored_info[key].update(value)
+                    else:
+                        stored_info[key] = value
+                else:
+                    stored_info[key] = value
+            
+            # Update attack types
+            if attack_type and attack_type not in stored_attack_types:
+                stored_attack_types.append(attack_type)
+            
+            # Save updated information
+            db_conn.execute(
+                """UPDATE devices SET 
+                hostname = ?, 
+                mac = COALESCE(?, mac),
+                last_seen = ?,
+                attack_types = ?,
+                detection_count = detection_count + 1,
+                device_info = ?
+                WHERE ip = ?""",
+                (
+                    hostname or device[1],
+                    mac,
+                    current_time,
+                    json.dumps(stored_attack_types),
+                    json.dumps(stored_info),
+                    ip
+                )
+            )
+            db_conn.commit()
+            
+            return stored_info
+        else:
+            # New device
+            attack_types = [attack_type] if attack_type else []
+            
+            db_conn.execute(
+                """INSERT INTO devices 
+                (ip, hostname, mac, first_seen, last_seen, attack_types, detection_count, device_info) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    ip,
+                    hostname,
+                    mac,
+                    current_time,
+                    current_time,
+                    json.dumps(attack_types),
+                    1,
+                    json.dumps(info)
+                )
+            )
+            db_conn.commit()
+            
+            return info
+    except Exception as e:
+        logger.error(f"Error saving device info for {ip}: {e}")
+        return info
 
 def insert_log(ts, host, message):
     try:
@@ -100,7 +276,8 @@ INDEX_TEMPLATE = """
   <nav class=\"navbar navbar-dark bg-dark fixed-top\">
     <div class=\"container-fluid\">
       <a class=\"navbar-brand\" href=\"/\">SysLogger</a>
-      <a class=\"btn btn-secondary\" href=\"/logs\">View Logs</a>
+      <a class=\"btn btn-secondary me-2\" href=\"/logs\">View Logs</a>
+      <a class=\"btn btn-info\" href=\"/devices\">View Devices</a>
     </div>
   </nav>
   <div class=\"container mt-4\">
@@ -121,6 +298,34 @@ INDEX_TEMPLATE = """
       {% endfor %}
     {% else %}
       <p>No suspicious activity detected.</p>
+    {% endif %}
+    
+    {% if device_alerts %}
+    <h2>Detected Devices</h2>
+    <div class=\"table-responsive\">
+      <table class=\"table table-striped table-hover\">
+        <thead>
+          <tr>
+            <th>IP</th>
+            <th>Hostname</th>
+            <th>Attack Type</th>
+            <th>Count</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ip, info in device_alerts.items() %}
+          <tr>
+            <td>{{ ip }}</td>
+            <td>{{ info.hostname if info.hostname else 'Unknown' }}</td>
+            <td>{{ info.type }}</td>
+            <td>{{ info.count }}</td>
+            <td><a href=\"/device/{{ ip }}\" class=\"btn btn-sm btn-primary\">View Details</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
     {% endif %}
 
     <h2>Recent Logs</h2>
@@ -169,8 +374,74 @@ LOG_TEMPLATE = """
 </html>
 """
 
+# Updated device info template for displaying device information
+DEVICE_TEMPLATE = """
+<!doctype html>
+<html lang=\"en\">
+<head>
+  <meta charset=\"utf-8\">
+  <title>Device Information</title>
+  <link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css\">
+  <style>
+    body {padding-top:4rem;}
+    .device-info {font-family:monospace;}
+  </style>
+</head>
+<body>
+  <nav class=\"navbar navbar-dark bg-dark fixed-top\">
+    <div class=\"container-fluid\">
+      <a class=\"navbar-brand\" href=\"/\">SysLogger</a>
+    </div>
+  </nav>
+  <div class=\"container mt-4\">
+    <h2>Device Information: {{ device.ip }}</h2>
+    
+    <div class=\"card mb-3\">
+      <div class=\"card-header\">
+        <strong>Basic Information</strong>
+      </div>
+      <div class=\"card-body\">
+        <p><strong>IP:</strong> {{ device.ip }}</p>
+        <p><strong>Hostname:</strong> {{ device.hostname or 'Unknown' }}</p>
+        <p><strong>MAC Address:</strong> {{ device.mac or 'Unknown' }}</p>
+        <p><strong>First Seen:</strong> {{ device.first_seen }}</p>
+        <p><strong>Last Seen:</strong> {{ device.last_seen }}</p>
+        <p><strong>Detection Count:</strong> {{ device.detection_count }}</p>
+      </div>
+    </div>
+
+    <div class=\"card mb-3\">
+      <div class=\"card-header\">
+        <strong>Attack History</strong>
+      </div>
+      <div class=\"card-body\">
+        <p><strong>Attack Types:</strong></p>
+        <ul>
+        {% for attack_type in attack_types %}
+          <li>{{ attack_type }}</li>
+        {% endfor %}
+        </ul>
+      </div>
+    </div>
+
+    <div class=\"card mb-3\">
+      <div class=\"card-header\">
+        <strong>Network Information</strong>
+      </div>
+      <div class=\"card-body device-info\">
+        <pre>{{ network_info | tojson(indent=2) }}</pre>
+      </div>
+    </div>
+
+    <p class=\"mt-3\"><a href=\"/\" class=\"btn btn-primary\">Back to Dashboard</a></p>
+  </div>
+</body>
+</html>
+"""
+
 def analyze_logs():
     alerts = []
+    device_alerts = {}
     stats = {
         "deauth": 0,
         "auth_fail": 0,
@@ -192,76 +463,180 @@ def analyze_logs():
         rows = cur.fetchall()
         lines = [r[0] for r in rows]
     except Exception:
-        return alerts, stats
+        return alerts, stats, device_alerts
 
-    deauth_map = {}
-    auth_map = {}
-    portscan_map = {}
-    dhcp_map = {}
-    firewall_map = {}
-    dos_map = {}
-
-    deauth_re = re.compile(r"deauth\w*.*?((?:[0-9a-f]{2}:){5}[0-9a-f]{2})", re.I)
-    deauth_alt = re.compile(r"deauthenticated.*?((?:[0-9a-f]{2}:){5}[0-9a-f]{2})", re.I)
-    auth_re = re.compile(r"failed (?:login|password).*from ([0-9.]+)", re.I)
-    port_re = re.compile(r"(?:syn flood|port scan).*from ([0-9.]+)", re.I)
-    dhcp_re = re.compile(r"dhcp(?:discover|request).*?((?:[0-9a-f]{2}:){5}[0-9a-f]{2})", re.I)
-    firewall_re = re.compile(r"(?:DENY|DROP).*SRC=([0-9.]+)", re.I)
-    dos_re = re.compile(r"(?:ddos|dos attack|syn flood).*from ([0-9.]+)", re.I)
+    deauth_map = {}  # MAC -> count
+    auth_fail_map = {}  # IP/Client -> count
+    port_scan_map = {}  # IP -> count
+    dhcp_map = {}  # MAC -> count
+    firewall_map = {}  # IP -> count
+    dos_map = {}  # IP -> count
 
     for line in lines:
-        if deauth_re.search(line) or deauth_alt.search(line):
-            m = re.search(r"([0-9a-f]{2}:){5}[0-9a-f]{2}", line, re.I)
-            mac = m.group().lower() if m else "unknown"
-            deauth_map[mac] = deauth_map.get(mac, 0) + 1
-        m = auth_re.search(line)
-        if m:
-            ip = m.group(1)
-            auth_map[ip] = auth_map.get(ip, 0) + 1
-        m = port_re.search(line)
-        if m:
-            ip = m.group(1)
-            portscan_map[ip] = portscan_map.get(ip, 0) + 1
-            alerts.append(("Possible Attack", line.strip()))
-        m = dhcp_re.search(line)
-        if m:
-            mac = m.group(1).lower()
-            dhcp_map[mac] = dhcp_map.get(mac, 0) + 1
-        m = firewall_re.search(line)
-        if m:
-            ip = m.group(1)
-            firewall_map[ip] = firewall_map.get(ip, 0) + 1
-        m = dos_re.search(line)
-        if m:
-            ip = m.group(1)
-            dos_map[ip] = dos_map.get(ip, 0) + 1
+        if "Deauth" in line or "deauth" in line:
+            match = re.search(r"([0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2})", line)
+            if match:
+                mac = match.group(1)
+                deauth_map[mac] = deauth_map.get(mac, 0) + 1
 
+        if "Auth fail" in line or "auth fail" in line:
+            match = re.search(r"from ([\d\.]+|[0-9A-Fa-f:]+|[\w-]+)", line)
+            if match:
+                client = match.group(1)
+                auth_fail_map[client] = auth_fail_map.get(client, 0) + 1
+
+        if "scan" in line.lower():
+            match = re.search(r"([\d\.]+|[0-9A-Fa-f:]+)", line)
+            if match:
+                ip = match.group(1)
+                port_scan_map[ip] = port_scan_map.get(ip, 0) + 1
+
+        if "DHCP request" in line or "dhcp discover" in line.lower():
+            match = re.search(r"([0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2})", line)
+            if match:
+                mac = match.group(1)
+                dhcp_map[mac] = dhcp_map.get(mac, 0) + 1
+
+        if "DROP" in line or "SYN flood" in line or "RST flood" in line:
+            match = re.search(r"SRC=([\d\.]+)", line) or re.search(r"src=([\d\.]+)", line) or re.search(r"from ([\d\.]+)", line)
+            if match:
+                ip = match.group(1)
+                firewall_map[ip] = firewall_map.get(ip, 0) + 1
+
+        if "DoS" in line or "DDoS" in line or "dos_" in line or "flood" in line.lower():
+            match = re.search(r"([\d\.]+|[0-9A-Fa-f:]+)", line)
+            if match:
+                ip = match.group(1)
+                dos_map[ip] = dos_map.get(ip, 0) + 1
+
+    # Process alerts and gather device information
     for mac, count in deauth_map.items():
         stats["deauth"] += count
         if count >= DEAUTH_THRESHOLD:
-            alerts.append(("Deauth Flood", f"{mac} seen {count} times"))
-    for ip, count in auth_map.items():
+            # Try to find an IP for this MAC address
+            ip_for_mac = None
+            try:
+                # Check if we have the IP for this MAC in our database
+                cur = db_conn.cursor()
+                cur.execute("SELECT ip FROM devices WHERE mac = ?", (mac,))
+                device = cur.fetchone()
+                if device:
+                    ip_for_mac = device[0]
+            except Exception:
+                pass
+            
+            alert_text = f"{mac} seen {count} times"
+            alerts.append(("Deauth Attack", alert_text))
+            
+            # Add device information
+            if ip_for_mac and is_valid_ip(ip_for_mac):
+                device_info = gather_device_info(ip_for_mac, "Deauth Attack")
+                if device_info:
+                    device_alerts[ip_for_mac] = {
+                        "type": "Deauth Attack",
+                        "count": count,
+                        "identifier": mac,
+                        "info": device_info
+                    }
+
+    for client, count in auth_fail_map.items():
         stats["auth_fail"] += count
         if count >= AUTH_FAIL_THRESHOLD:
-            alerts.append(("Auth Brute Force", f"{ip} failed {count} times"))
-    for ip, count in portscan_map.items():
+            alert_text = f"{client} seen {count} times"
+            alerts.append(("Auth Failures", alert_text))
+            
+            # Add device information if client is an IP
+            if is_valid_ip(client):
+                device_info = gather_device_info(client, "Auth Failures")
+                if device_info:
+                    device_alerts[client] = {
+                        "type": "Auth Failures",
+                        "count": count,
+                        "identifier": client,
+                        "info": device_info
+                    }
+
+    for ip, count in port_scan_map.items():
         stats["port_scan"] += count
         if count >= PORT_SCAN_THRESHOLD:
-            alerts.append(("Port Scans", f"{ip} seen {count} times"))
+            alert_text = f"{ip} seen {count} times"
+            alerts.append(("Port Scan", alert_text))
+            
+            # Add device information
+            if is_valid_ip(ip):
+                device_info = gather_device_info(ip, "Port Scan")
+                if device_info:
+                    device_alerts[ip] = {
+                        "type": "Port Scan",
+                        "count": count,
+                        "identifier": ip,
+                        "info": device_info
+                    }
+
     for mac, count in dhcp_map.items():
         stats["dhcp"] += count
         if count >= DHCP_REQ_THRESHOLD:
-            alerts.append(("DHCP Flood", f"{mac} seen {count} times"))
+            alert_text = f"{mac} seen {count} times"
+            alerts.append(("DHCP Flood", alert_text))
+            
+            # Try to find an IP for this MAC address
+            ip_for_mac = None
+            try:
+                # Check if we have the IP for this MAC in our database
+                cur = db_conn.cursor()
+                cur.execute("SELECT ip FROM devices WHERE mac = ?", (mac,))
+                device = cur.fetchone()
+                if device:
+                    ip_for_mac = device[0]
+            except Exception:
+                pass
+            
+            # Add device information
+            if ip_for_mac and is_valid_ip(ip_for_mac):
+                device_info = gather_device_info(ip_for_mac, "DHCP Flood")
+                if device_info:
+                    device_alerts[ip_for_mac] = {
+                        "type": "DHCP Flood",
+                        "count": count,
+                        "identifier": mac,
+                        "info": device_info
+                    }
+
     for ip, count in firewall_map.items():
         stats["firewall"] += count
         if count >= FIREWALL_THRESHOLD:
-            alerts.append(("Firewall Drops", f"{ip} seen {count} times"))
+            alert_text = f"{ip} seen {count} times"
+            alerts.append(("Firewall Drops", alert_text))
+            
+            # Add device information
+            if is_valid_ip(ip):
+                device_info = gather_device_info(ip, "Firewall Drops")
+                if device_info:
+                    device_alerts[ip] = {
+                        "type": "Firewall Drops",
+                        "count": count,
+                        "identifier": ip,
+                        "info": device_info
+                    }
+
     for ip, count in dos_map.items():
         stats["dos"] += count
         if count >= DOS_THRESHOLD:
-            alerts.append(("Possible DoS", f"{ip} seen {count} times"))
+            alert_text = f"{ip} seen {count} times"
+            alerts.append(("Possible DoS", alert_text))
+            
+            # Add device information
+            if is_valid_ip(ip):
+                device_info = gather_device_info(ip, "Possible DoS")
+                if device_info:
+                    device_alerts[ip] = {
+                        "type": "Possible DoS",
+                        "count": count,
+                        "identifier": ip,
+                        "info": device_info
+                    }
 
-    return alerts, stats
+    return alerts, stats, device_alerts
 
 def get_recent_logs(num=WEB_LOG_LINES):
     try:
@@ -295,11 +670,65 @@ def get_filtered_logs(query=None, num=1000):
     return [f"{ts} {host} {msg}" for ts, host, msg in reversed(rows)]
 
 
+def get_device_info(ip):
+    """Get full device information from the database"""
+    try:
+        cur = db_conn.cursor()
+        cur.execute("SELECT * FROM devices WHERE ip = ?", (ip,))
+        device = cur.fetchone()
+        
+        if device:
+            return {
+                "ip": device[0],
+                "hostname": device[1],
+                "mac": device[2],
+                "first_seen": device[3],
+                "last_seen": device[4],
+                "attack_types": json.loads(device[5]) if device[5] else [],
+                "detection_count": device[6],
+                "device_info": json.loads(device[7]) if device[7] else {}
+            }
+        return None
+    except Exception as e:
+        logger.error(f"Error getting device info: {e}")
+        return None
+
+def get_all_devices():
+    """Get all devices from the database"""
+    try:
+        cur = db_conn.cursor()
+        cur.execute("SELECT * FROM devices ORDER BY detection_count DESC")
+        devices = cur.fetchall()
+        
+        result = []
+        for device in devices:
+            result.append({
+                "ip": device[0],
+                "hostname": device[1],
+                "mac": device[2],
+                "first_seen": device[3],
+                "last_seen": device[4],
+                "attack_types": json.loads(device[5]) if device[5] else [],
+                "detection_count": device[6],
+                "device_info": json.loads(device[7]) if device[7] else {}
+            })
+        return result
+    except Exception as e:
+        logger.error(f"Error getting all devices: {e}")
+        return []
+
 @app.route('/')
 def index():
-    alerts, stats = analyze_logs()
+    alerts, stats, device_alerts = analyze_logs()
     logs = get_recent_logs()
-    return render_template_string(INDEX_TEMPLATE, alerts=alerts, logs=logs, stats=stats)
+    
+    # Add hostname information to device alerts
+    for ip, info in device_alerts.items():
+        device = get_device_info(ip)
+        if device:
+            info["hostname"] = device["hostname"]
+    
+    return render_template_string(INDEX_TEMPLATE, alerts=alerts, logs=logs, stats=stats, device_alerts=device_alerts)
 
 
 @app.route('/logs')
@@ -314,6 +743,90 @@ def download_logs():
     if os.path.exists(LOG_FILE):
         return send_file(LOG_FILE, as_attachment=True)
     return 'Log file not found', 404
+
+@app.route('/devices')
+def devices_list():
+    devices = get_all_devices()
+    device_count = len(devices)
+    
+    html = f'''
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Detected Devices</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <style>
+    body {{padding-top:4rem;}}
+  </style>
+</head>
+<body>
+  <nav class="navbar navbar-dark bg-dark fixed-top">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="/">SysLogger</a>
+    </div>
+  </nav>
+  <div class="container mt-4">
+    <h2>Detected Devices ({device_count})</h2>
+    
+    <div class="table-responsive">
+      <table class="table table-striped table-hover">
+        <thead>
+          <tr>
+            <th>IP</th>
+            <th>Hostname</th>
+            <th>MAC</th>
+            <th>Detection Count</th>
+            <th>Last Seen</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+'''
+    
+    for device in devices:
+        hostname = device.get('hostname', 'Unknown')
+        mac = device.get('mac', 'Unknown')
+        html += f'''
+          <tr>
+            <td>{device['ip']}</td>
+            <td>{hostname}</td>
+            <td>{mac}</td>
+            <td>{device['detection_count']}</td>
+            <td>{device['last_seen']}</td>
+            <td><a href="/device/{device['ip']}" class="btn btn-sm btn-primary">View Details</a></td>
+          </tr>
+'''
+    
+    html += '''
+        </tbody>
+      </table>
+    </div>
+    
+    <p class="mt-3"><a href="/" class="btn btn-secondary">Back to Dashboard</a></p>
+  </div>
+</body>
+</html>
+'''
+    
+    return html
+
+@app.route('/device/<ip>')
+def device_detail(ip):
+    device = get_device_info(ip)
+    if not device:
+        return 'Device not found', 404
+    
+    # Prepare device information
+    attack_types = device.get('attack_types', [])
+    network_info = device.get('device_info', {}).get('network_info', {})
+    
+    return render_template_string(
+        DEVICE_TEMPLATE, 
+        device=device, 
+        attack_types=attack_types, 
+        network_info=network_info
+    )
 
 if LOG_TO_STDOUT:
     stream_handler = logging.StreamHandler()

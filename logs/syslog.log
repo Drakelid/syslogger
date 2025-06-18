@@ -6397,3 +6397,77 @@
 2025-06-18 09:06:22,389 RT-AX57_Go-9AFA-99E9A55-R kernel: 7981@C11L1rax0,rtmp_chk_rx_err() 5381: CM Length Error
 2025-06-18 09:06:22,441 RT-AX57_Go-9AFA-99E9A55-R kernel: 7981@C11L1rax0,header_packet_process() 7283: header_packet_process(): CheckRxError!
 2025-06-18 09:06:22,441 RT-AX57_Go-9AFA-99E9A55-R kernel: , WlanIndex = 3
+2025-06-18 09:10:59,253 ZenWiFi_XT8-46A0-99E9A55-C dnsmasq-dhcp[14163]: DHCPDISCOVER(br0) fc:77:74:f6:ae:eb
+2025-06-18 09:10:59,273 ZenWiFi_XT8-46A0-99E9A55-C dnsmasq-dhcp[14163]: DHCPOFFER(br0) 192.168.50.195 fc:77:74:f6:ae:eb
+2025-06-18 09:11:06,257 ZenWiFi_XT8-46A0-99E9A55-C dnsmasq-dhcp[14163]: DHCPDISCOVER(br0) fc:77:74:f6:ae:eb
+2025-06-18 09:11:06,273 ZenWiFi_XT8-46A0-99E9A55-C dnsmasq-dhcp[14163]: DHCPOFFER(br0) 192.168.50.195 fc:77:74:f6:ae:eb
+2025-06-18 09:11:13,301 ZenWiFi_XT8-46A0-99E9A55-C dnsmasq-dhcp[14163]: DHCPDISCOVER(br0) fc:77:74:f6:ae:eb
+2025-06-18 09:11:13,360 ZenWiFi_XT8-46A0-99E9A55-C dnsmasq-dhcp[14163]: DHCPOFFER(br0) 192.168.50.195 fc:77:74:f6:ae:eb
+2025-06-18 09:14:33,799 RT-AX57_Go-9AFA-99E9A55-R kernel: 7981@C11L1rax0,header_packet_process() 7283: header_packet_process(): CheckRxError!
+2025-06-18 09:14:33,820 RT-AX57_Go-9AFA-99E9A55-R kernel: 7981@C11L1rax0,rtmp_chk_rx_err() 5381: CM Length Error
+2025-06-18 09:14:33,821 RT-AX57_Go-9AFA-99E9A55-R kernel: , WlanIndex = 3
+2025-06-18 09:15:49,279 ZenWiFi_XT8-46A0-99E9A55-C acsd: acs_set_chspec: 0x1008 (8) for reason APCS_CSTIMER
+2025-06-18 09:16:07,550 RT-AX57_Go-9AFA-99E9A55-R kernel: 7981@C15L1rax0,GroupRekeyExec() 681: Rekey interval excess, Update Group Key for  3A:FD:27:A9:82:FA , DefaultKeyId= 1
+2025-06-18 09:16:07,585 RT-AX57_Go-9AFA-99E9A55-R kernel: 7981@C15L1rax0,GroupRekeyExec() 681: Rekey interval excess, Update Group Key for  68:3A:48:7C:1A:76 , DefaultKeyId= 1
+2025-06-18 09:16:07,607 RT-AX57_Go-9AFA-99E9A55-R kernel: 7981@C15L1rax0,GroupRekeyExec() 681: Rekey interval excess, Update Group Key for  A4:E5:7C:3A:91:32 , DefaultKeyId= 1
+2025-06-18 09:16:08,048 RT-AX57_Go-9AFA-99E9A55-R kernel: 7981@C15L2ra0,PeerGroupMsg2Action() 7330: AP SETKEYS DONE - AKMMap=WPA2-Personal, PairwiseCipher=AES, GroupCipher=AES from a4:e5:7c:3a:91:32
+2025-06-18 09:16:08,069 RT-AX57_Go-9AFA-99E9A55-R kernel: 7981@C15L2ra0,PeerGroupMsg2Action() 7330: AP SETKEYS DONE - AKMMap=WPA2-Personal, PairwiseCipher=AES, GroupCipher=AES from 3a:fd:27:a9:82:fa
+2025-06-18 09:16:08,130 RT-AX57_Go-9AFA-99E9A55-R kernel: 7981@C15L2ra0,PeerGroupMsg2Action() 7330: AP SETKEYS DONE - AKMMap=WPA2-Personal, PairwiseCipher=AES, GroupCipher=AES from 68:3a:48:7c:1a:76
+2025-06-18 09:22:45,265 RT-AX57_Go-9AFA-99E9A55-R kernel: 7981@C11L1ra0,rtmp_chk_rx_err() 5381: CM Length Error
+2025-06-18 09:22:45,307 RT-AX57_Go-9AFA-99E9A55-R kernel: 7981@C11L1ra0,header_packet_process() 7283: header_packet_process(): CheckRxError!
+2025-06-18 09:22:45,327 RT-AX57_Go-9AFA-99E9A55-R kernel: , WlanIndex = 3
+2025-06-18 09:25:17,695 RT-AX57_Go-9AFA-99E9A55-R kernel: 7981@C15L1rax0,GroupRekeyExec() 681: Rekey interval excess, Update Group Key for  90:13:DA:AB:1C:7A , DefaultKeyId= 1
+2025-06-18 09:25:17,726 RT-AX57_Go-9AFA-99E9A55-R kernel: 7981@C15L1rax0,GroupRekeyExec() 681: Rekey interval excess, Update Group Key for  1E:F5:D3:E0:72:D7 , DefaultKeyId= 1
+2025-06-18 09:25:17,726 RT-AX57_Go-9AFA-99E9A55-R kernel: 7981@C15L1rax0,GroupRekeyExec() 681: Rekey interval excess, Update Group Key for  FC:77:74:F6:AE:EB , DefaultKeyId= 1
+2025-06-18 09:25:17,726 RT-AX57_Go-9AFA-99E9A55-R kernel: 7981@C15L1rax0,GroupRekeyExec() 681: Rekey interval excess, Update Group Key for  40:CB:C0:E2:B7:CF , DefaultKeyId= 1
+2025-06-18 09:25:18,233 RT-AX57_Go-9AFA-99E9A55-R kernel: 7981@C15L2apcli0,PeerGroupMsg2Action() 7330: AP SETKEYS DONE - AKMMap=WPA2-Personal, PairwiseCipher=AES, GroupCipher=AES from fc:77:74:f6:ae:eb
+2025-06-18 09:25:18,234 RT-AX57_Go-9AFA-99E9A55-R kernel: 7981@C15L2apcli0,PeerGroupMsg2Action() 7330: AP SETKEYS DONE - AKMMap=WPA2-Personal, PairwiseCipher=AES, GroupCipher=AES from 90:13:da:ab:1c:7a
+2025-06-18 09:25:18,277 RT-AX57_Go-9AFA-99E9A55-R kernel: 7981@C15L2apcli0,PeerGroupMsg2Action() 7330: AP SETKEYS DONE - AKMMap=WPA2-Personal, PairwiseCipher=AES, GroupCipher=AES from 40:cb:c0:e2:b7:cf
+2025-06-18 09:25:18,311 RT-AX57_Go-9AFA-99E9A55-R kernel: 7981@C15L2apcli0,PeerGroupMsg2Action() 7330: AP SETKEYS DONE - AKMMap=WPA2-Personal, PairwiseCipher=AES, GroupCipher=AES from 1e:f5:d3:e0:72:d7
+2025-06-18 09:30:56,677 RT-AX57_Go-9AFA-99E9A55-R kernel: 7981@C11L1rax0,rtmp_chk_rx_err() 5381: CM Length Error
+2025-06-18 09:30:56,701 RT-AX57_Go-9AFA-99E9A55-R kernel: 7981@C11L1rax0,header_packet_process() 7283: header_packet_process(): CheckRxError!
+2025-06-18 09:30:56,723 RT-AX57_Go-9AFA-99E9A55-R kernel: , WlanIndex = 3
+2025-06-18 09:39:08,073 RT-AX57_Go-9AFA-99E9A55-R kernel: 7981@C11L1rax0,rtmp_chk_rx_err() 5381: CM Length Error
+2025-06-18 09:39:08,094 RT-AX57_Go-9AFA-99E9A55-R kernel: 7981@C11L1rax0,header_packet_process() 7283: header_packet_process(): CheckRxError!
+2025-06-18 09:39:08,115 RT-AX57_Go-9AFA-99E9A55-R kernel: , WlanIndex = 3
+2025-06-18 09:44:19,905 ZenWiFi_XT8-46A0-99E9A55-C acsd: acs_set_chspec: 0x1007 (7) for reason APCS_CSTIMER
+2025-06-18 09:47:19,545 RT-AX57_Go-9AFA-99E9A55-R kernel: 7981@C11L1ra0,rtmp_chk_rx_err() 5381: CM Length Error
+2025-06-18 09:47:19,605 RT-AX57_Go-9AFA-99E9A55-R kernel: 7981@C11L1ra0,header_packet_process() 7283: header_packet_process(): CheckRxError!
+2025-06-18 09:47:19,653 RT-AX57_Go-9AFA-99E9A55-R kernel: , WlanIndex = 3
+2025-06-18 09:55:03,458 ZenWiFi_XT8-46A0-99E9A55-C hostapd: eth4: STA b0:c5:54:67:7e:79 WPA: group key handshake completed (RSN)
+2025-06-18 09:55:03,515 ZenWiFi_XT8-46A0-99E9A55-C hostapd: eth4: STA 38:be:ab:64:65:08 WPA: group key handshake completed (RSN)
+2025-06-18 09:55:29,903 ZenWiFi_XT8-46A0-99E9A55-C rc_service: httpd 1788:notify_rc restart_dnsmasq
+2025-06-18 09:55:29,935 ZenWiFi_XT8-46A0-99E9A55-C dnsmasq[28225]: warning: interface br3 does not currently exist
+2025-06-18 09:55:29,935 ZenWiFi_XT8-46A0-99E9A55-C dnsmasq[28225]: started, version 2.90 cachesize 1500
+2025-06-18 09:55:29,949 ZenWiFi_XT8-46A0-99E9A55-C dnsmasq[14163]: exiting on receipt of SIGTERM
+2025-06-18 09:55:30,000 ZenWiFi_XT8-46A0-99E9A55-C dnsmasq[28225]: warning: interface br2 does not currently exist
+2025-06-18 09:55:30,022 ZenWiFi_XT8-46A0-99E9A55-C dnsmasq-dhcp[28225]: DHCP, IP range 192.168.101.2 -- 192.168.101.254, lease time 1d
+2025-06-18 09:55:30,023 ZenWiFi_XT8-46A0-99E9A55-C dnsmasq[28225]: warning: interface pptp* does not currently exist
+2025-06-18 09:55:30,023 ZenWiFi_XT8-46A0-99E9A55-C dnsmasq[28225]: compile time options: IPv6 GNU-getopt no-RTC no-DBus no-UBus no-i18n no-IDN DHCP DHCPv6 no-Lua TFTP no-conntrack ipset no-nftset no-auth cryptohash DNSSEC no-ID loop-detect no-inotify no-dumpfile
+2025-06-18 09:55:30,040 ZenWiFi_XT8-46A0-99E9A55-C dnsmasq[28225]: using nameserver 92.220.228.70#53
+2025-06-18 09:55:30,040 ZenWiFi_XT8-46A0-99E9A55-C dnsmasq[28225]: using nameserver 109.247.114.4#53 for domain lyse.net
+2025-06-18 09:55:30,040 DB insert failed: no more rows available
+2025-06-18 09:55:30,041 ZenWiFi_XT8-46A0-99E9A55-C dnsmasq[28225]: using nameserver 92.220.228.70#53
+2025-06-18 09:55:30,052 ZenWiFi_XT8-46A0-99E9A55-C dnsmasq[28225]: using nameserver 109.247.114.4#53
+2025-06-18 09:55:30,057 ZenWiFi_XT8-46A0-99E9A55-C dnsmasq[28225]: asynchronous logging enabled, queue limit is 5 messages
+2025-06-18 09:55:30,057 DB insert failed: no more rows available
+2025-06-18 09:55:30,059 ZenWiFi_XT8-46A0-99E9A55-C dnsmasq[28225]: using nameserver 92.220.228.70#53 for domain lyse.net
+2025-06-18 09:55:30,072 ZenWiFi_XT8-46A0-99E9A55-C dnsmasq[28225]: using nameserver 109.247.114.4#53
+2025-06-18 09:55:30,072 ZenWiFi_XT8-46A0-99E9A55-C dnsmasq-dhcp[28225]: DHCP, IP range 192.168.102.2 -- 192.168.102.254, lease time 1d
+2025-06-18 09:55:30,079 ZenWiFi_XT8-46A0-99E9A55-C dnsmasq[28225]: warning: interface br1 does not currently exist
+2025-06-18 09:55:30,079 ZenWiFi_XT8-46A0-99E9A55-C dnsmasq[28225]: using nameserver 92.220.228.70#53 for domain lyse.net
+2025-06-18 09:55:30,079 ZenWiFi_XT8-46A0-99E9A55-C dnsmasq-dhcp[28225]: DHCP, IP range 192.168.103.2 -- 192.168.103.254, lease time 1d
+2025-06-18 09:55:30,079 ZenWiFi_XT8-46A0-99E9A55-C dnsmasq[28225]: read /etc/hosts - 24 names
+2025-06-18 09:55:30,088 ZenWiFi_XT8-46A0-99E9A55-C dnsmasq-dhcp[28225]: DHCP, IP range 192.168.50.2 -- 192.168.50.254, lease time 1d
+2025-06-18 09:55:30,089 ZenWiFi_XT8-46A0-99E9A55-C dnsmasq[28225]: using nameserver 109.247.114.4#53 for domain lyse.net
+2025-06-18 09:55:30,993 RT-AX57_Go-9AFA-99E9A55-R kernel: 7981@C11L1apcli0,rtmp_chk_rx_err() 5381: CM Length Error
+2025-06-18 09:55:31,063 RT-AX57_Go-9AFA-99E9A55-R kernel: 7981@C11L1apcli0,header_packet_process() 7283: header_packet_process(): CheckRxError!
+2025-06-18 09:55:31,105 RT-AX57_Go-9AFA-99E9A55-R kernel: , WlanIndex = 3
+2025-06-18 09:56:21,278 ZenWiFi_XT8-46A0-99E9A55-C rc_service: cfg_server 1892:notify_rc restart_logger
+2025-06-18 09:56:22,328 RT-AX57_Go-9AFA-99E9A55-R kernel: nvram_commit(): pid 26703 comm [cfg_client]
+2025-06-18 09:56:22,369 RT-AX57_Go-9AFA-99E9A55-R kernel: found private data block and skip it
+2025-06-18 09:56:22,398 RT-AX57_Go-9AFA-99E9A55-R kernel: _nvram_free: 26703(cfg_client) nvram_idx(1 / 2)
+2025-06-18 09:56:25,355 RT-AX57_Go-9AFA-99E9A55-R kernel: nvram_commit(): pid 26704 comm [cfg_client]
+2025-06-18 09:56:25,414 RT-AX57_Go-9AFA-99E9A55-R kernel: found private data block and skip it
+2025-06-18 09:56:25,474 RT-AX57_Go-9AFA-99E9A55-R rc_service: cfg_client 5569:notify_rc restart_logger
+2025-06-18 09:56:25,532 RT-AX57_Go-9AFA-99E9A55-R kernel: _nvram_free: 26704(cfg_client) nvram_idx(0 / 2)
