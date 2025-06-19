@@ -1,7 +1,33 @@
 Flask>=2.0.0
+Flask-SocketIO>=5.3.0
+PyYAML>=6.0
+schedule>=1.1.0
 geoip2>=4.6.0
 dnspython>=2.1.0
 python-whois>=0.7.3
 requests>=2.28.0
 python-nmap>=0.7.1
 ipaddress>=1.0.23
+
+# Attack Visualization
+folium>=0.12.1
+plotly>=5.5.0
+matplotlib>=3.5.1
+networkx>=2.7.1
+
+# Enhanced Threat Intelligence
+OTXv2>=1.5.1  # AlienVault OTX integration
+vtapi3>=1.0.0  # VirusTotal API integration
+pymisp>=2.4.156  # MISP threat intelligence platform
+
+# Machine Learning for Attack Detection
+scikit-learn>=1.0.2
+pandas>=1.4.1
+numpy>=1.22.3
+joblib>=1.1.0
+
+# Advanced Reporting
+WeasyPrint>=54.3  # PDF generation
+jinja2>=3.0.0  # Advanced templating
+pyjwt>=2.3.0  # For secure API access
+xlsxwriter>=3.0.3  # Excel report generation

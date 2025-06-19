@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SysLogger Dashboard</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+        }
+        .navbar {
+            background-color: #343a40;
+        }
+        .sidebar {
+            background-color: #212529;
+            color: white;
+            min-height: calc(100vh - 56px);
+            padding-top: 20px;
+        }
+        .sidebar a {
+            color: #adb5bd;
+            text-decoration: none;
+            padding: 10px 20px;
+            display: block;
+        }
+        .sidebar a:hover, .sidebar a.active {
+            color: white;
+            background-color: #495057;
+        }
+        .card {
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            border: none;
+        }
+        .card-header {
+            background-color: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+            font-weight: bold;
+        }
+        .stats-card {
+            text-align: center;
+            padding: 15px;
+        }
+        .stats-card i {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        .chart-container {
+            height: 300px;
+        }
+        .threat-item {
+            border-left: 4px solid;
+            margin-bottom: 10px;
+            padding: 10px;
+            background-color: white;
+        }
+        .threat-high {
+            border-color: #dc3545;
+        }
+        .threat-medium {
+            border-color: #ffc107;
+        }
+        .threat-low {
+            border-color: #17a2b8;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <i class="bi bi-shield-lock"></i> SysLogger
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarSupportedContent">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/">Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/logs">Logs</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/alerts">Alerts</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/network">Network</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/anomalies">Anomalies</a>
+                    </li>
+                </ul>
+                <span class="navbar-text">
+                    <i class="bi bi-clock"></i> <span id="current-time">Loading...</span>
+                </span>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-md-2 sidebar">
+                <a href="/" class="active"><i class="bi bi-speedometer2 me-2"></i> Dashboard</a>
+                <a href="/logs"><i class="bi bi-journal-text me-2"></i> Logs</a>
+                <a href="/alerts"><i class="bi bi-exclamation-triangle me-2"></i> Alerts</a>
+                <a href="/network"><i class="bi bi-diagram-3 me-2"></i> Network</a>
+                <a href="/anomalies"><i class="bi bi-graph-up me-2"></i> Anomalies</a>
+                <a href="/threat-intel"><i class="bi bi-shield me-2"></i> Threat Intel</a>
+                <a href="/maintenance"><i class="bi bi-gear me-2"></i> Maintenance</a>
+            </div>
+
+            <!-- Main Content -->
+            <div class="col-md-10 py-4">
+                <h2 class="mb-4">System Overview</h2>
+                
+                <!-- Stats Cards -->
+                <div class="row mb-4">
+                    <div class="col-xl-3 col-md-6">
+                        <div class="card stats-card">
+                            <i class="bi bi-database text-primary"></i>
+                            <div class="stat-value">1,234</div>
+                            <div class="stat-label">Logs Today</div>
+                        </div>
+                    </div>
+                    <div class="col-xl-3 col-md-6">
+                        <div class="card stats-card">
+                            <i class="bi bi-exclamation-triangle text-warning"></i>
+                            <div class="stat-value">18</div>
+                            <div class="stat-label">Active Alerts</div>
+                        </div>
+                    </div>
+                    <div class="col-xl-3 col-md-6">
+                        <div class="card stats-card">
+                            <i class="bi bi-shield-exclamation text-danger"></i>
+                            <div class="stat-value">5</div>
+                            <div class="stat-label">Security Incidents</div>
+                        </div>
+                    </div>
+                    <div class="col-xl-3 col-md-6">
+                        <div class="card stats-card">
+                            <i class="bi bi-graph-up text-success"></i>
+                            <div class="stat-value">99.8%</div>
+                            <div class="stat-label">System Uptime</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts Row -->
+                <div class="row mb-4">
+                    <!-- Log Volume Chart -->
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">Log Volume (Last 24 Hours)</div>
+                            <div class="card-body">
+                                <div id="log-volume-chart" class="chart-container"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Alert Types Chart -->
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">Alert Distribution</div>
+                            <div class="card-body">
+                                <div id="alert-types-chart" class="chart-container"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bottom Row -->
+                <div class="row">
+                    <!-- Recent Alerts -->
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">Recent Alerts</div>
+                            <div class="card-body">
+                                <div class="threat-item threat-high">
+                                    <div class="d-flex justify-content-between">
+                                        <strong>Multiple Authentication Failures</strong>
+                                        <span class="badge bg-danger">High</span>
+                                    </div>
+                                    <div>192.168.1.105 - 5 failed attempts</div>
+                                    <small class="text-muted">Today, 14:25:33</small>
+                                </div>
+                                <div class="threat-item threat-medium">
+                                    <div class="d-flex justify-content-between">
+                                        <strong>Unusual Network Traffic Pattern</strong>
+                                        <span class="badge bg-warning">Medium</span>
+                                    </div>
+                                    <div>High volume of outbound traffic to 203.0.113.41</div>
+                                    <small class="text-muted">Today, 13:12:05</small>
+                                </div>
+                                <div class="threat-item threat-low">
+                                    <div class="d-flex justify-content-between">
+                                        <strong>System Configuration Change</strong>
+                                        <span class="badge bg-info">Low</span>
+                                    </div>
+                                    <div>Firewall rule modified by admin</div>
+                                    <small class="text-muted">Today, 11:47:19</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- ML Anomaly Detection -->
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">ML-Based Anomaly Detection</div>
+                            <div class="card-body">
+                                <div id="anomaly-chart" class="chart-container"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/socket.io/client-dist/socket.io.js"></script>
+    <script>
+        // Update current time
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('current-time').textContent = now.toLocaleString();
+        }
+        updateTime();
+        setInterval(updateTime, 1000);
+
+        // Log Volume Chart
+        const logVolumeCtx = document.getElementById('log-volume-chart').getContext('2d');
+        const logVolumeChart = new Chart(logVolumeCtx, {
+            type: 'line',
+            data: {
+                labels: ['00:00', '02:00', '04:00', '06:00', '08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00', '22:00'],
+                datasets: [{
+                    label: 'Log Volume',
+                    data: [65, 59, 80, 81, 56, 55, 40, 120, 190, 140, 110, 95],
+                    fill: true,
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false
+            }
+        });
+
+        // Alert Types Chart
+        const alertTypesCtx = document.getElementById('alert-types-chart').getContext('2d');
+        const alertTypesChart = new Chart(alertTypesCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Authentication', 'Network', 'System', 'Application', 'Malware'],
+                datasets: [{
+                    data: [35, 25, 22, 15, 3],
+                    backgroundColor: [
+                        'rgba(255, 99, 132, 0.7)',
+                        'rgba(54, 162, 235, 0.7)',
+                        'rgba(255, 206, 86, 0.7)',
+                        'rgba(75, 192, 192, 0.7)',
+                        'rgba(153, 102, 255, 0.7)'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false
+            }
+        });
+
+        // Anomaly Detection Chart
+        const anomalyCtx = document.getElementById('anomaly-chart').getContext('2d');
+        const anomalyChart = new Chart(anomalyCtx, {
+            type: 'scatter',
+            data: {
+                datasets: [{
+                    label: 'Normal Traffic',
+                    data: [
+                        { x: 10, y: 15 }, { x: 15, y: 18 }, { x: 12, y: 14 }, { x: 18, y: 16 },
+                        { x: 15, y: 15 }, { x: 16, y: 17 }, { x: 14, y: 15 }, { x: 13, y: 14 },
+                        { x: 17, y: 16 }, { x: 16, y: 15 }, { x: 15, y: 14 }, { x: 14, y: 17 }
+                    ],
+                    backgroundColor: 'rgba(75, 192, 192, 0.7)'
+                }, {
+                    label: 'Anomalies',
+                    data: [
+                        { x: 5, y: 30 }, { x: 25, y: 5 }, { x: 30, y: 30 }
+                    ],
+                    backgroundColor: 'rgba(255, 99, 132, 0.7)'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { title: { display: true, text: 'Feature 1' } },
+                    y: { title: { display: true, text: 'Feature 2' } }
+                }
+            }
+        });
+
+        // Connect to Socket.IO for real-time updates
+        const socket = io();
+        socket.on('log_update', (data) => {
+            console.log('Log update received:', data);
+            // Update charts and stats with new data
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,441 @@
+{% extends 'base.html' %}
+
+{% block title %}Database Maintenance - SysLogger{% endblock %}
+
+{% block content %}
+<div id="maintenanceAdmin" class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="display-5 mb-3">Database Maintenance</h1>
+            <p class="text-muted">
+                Manage database performance, optimization, and data retention policies
+            </p>
+        </div>
+    </div>
+
+    <!-- Status and Actions -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card border-primary">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">Database Status</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row" id="dbStatusContainer">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <h6>Total Size</h6>
+                                <p id="dbSize" class="h3">Loading...</p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <h6>Total Records</h6>
+                                <p id="dbRecords" class="h3">Loading...</p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <h6>Date Range</h6>
+                                <p id="dbDateRange" class="h5">Loading...</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="dbStatsLoading" class="text-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-secondary">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="card-title mb-0">Actions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-3">
+                        <button id="btnRunMaintenance" class="btn btn-primary">
+                            <i class="bi bi-tools"></i> Run Maintenance Now
+                        </button>
+                        <button id="btnRefreshStats" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-clockwise"></i> Refresh Statistics
+                        </button>
+                    </div>
+                    <div class="mt-3">
+                        <div id="maintenanceStatus" class="alert alert-success d-none">
+                            Maintenance complete!
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Database Tables -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title">Table Statistics</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped" id="tableStats">
+                            <thead>
+                                <tr>
+                                    <th>Table</th>
+                                    <th>Row Count</th>
+                                    <th>Size</th>
+                                    <th>Oldest Record</th>
+                                    <th>Newest Record</th>
+                                    <th>Retention Policy</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tableStatsBody">
+                                <!-- Will be populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Retention Configuration -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title">Data Retention Policies</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">
+                        Current retention policies determine how long data is kept in the system. These policies 
+                        are configured in the application settings and applied automatically during maintenance.
+                    </p>
+                    
+                    <div id="retentionConfig">
+                        <!-- Will be populated dynamically -->
+                    </div>
+                    
+                    <div class="mt-4">
+                        <p class="text-muted">
+                            <i class="bi bi-info-circle"></i>
+                            To modify these settings, edit the config.yml file in the application's configuration directory.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Maintenance Log -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title">Maintenance Log</h5>
+                </div>
+                <div class="card-body">
+                    <div id="maintenanceLog" class="bg-dark text-light p-3 rounded" style="height: 200px; overflow-y: auto;">
+                        <div class="text-muted">No maintenance activity logged yet.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Maintenance Running Modal -->
+<div class="modal fade" id="maintenanceModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Running Maintenance</h5>
+            </div>
+            <div class="modal-body text-center p-5">
+                <div class="spinner-border text-primary mb-4" style="width: 3rem; height: 3rem;" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p>Maintenance tasks are running...</p>
+                <p class="text-muted small">This may take several minutes depending on database size.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initial load
+    loadDatabaseStats();
+    loadRetentionConfig();
+    
+    // Event listeners
+    document.getElementById('btnRunMaintenance').addEventListener('click', runMaintenance);
+    document.getElementById('btnRefreshStats').addEventListener('click', loadDatabaseStats);
+    
+    // Load database statistics
+    function loadDatabaseStats() {
+        const statusContainer = document.getElementById('dbStatusContainer');
+        const loadingSpinner = document.getElementById('dbStatsLoading');
+        const tableStatsBody = document.getElementById('tableStatsBody');
+        
+        statusContainer.style.opacity = '0.5';
+        loadingSpinner.style.display = 'block';
+        tableStatsBody.innerHTML = '';
+        
+        fetch('/api/maintenance/stats')
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    updateDatabaseStats(data.statistics);
+                } else {
+                    showError('Failed to load database statistics: ' + data.message);
+                }
+            })
+            .catch(error => {
+                showError('Error loading database statistics: ' + error);
+            })
+            .finally(() => {
+                statusContainer.style.opacity = '1';
+                loadingSpinner.style.display = 'none';
+            });
+    }
+    
+    // Load data retention configuration
+    function loadRetentionConfig() {
+        const retentionConfig = document.getElementById('retentionConfig');
+        
+        fetch('/api/maintenance/retention/config')
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    updateRetentionConfig(data.config);
+                } else {
+                    showError('Failed to load retention configuration: ' + data.message);
+                }
+            })
+            .catch(error => {
+                showError('Error loading retention configuration: ' + error);
+            });
+    }
+    
+    // Run maintenance tasks
+    function runMaintenance() {
+        // Show maintenance modal
+        const modal = new bootstrap.Modal(document.getElementById('maintenanceModal'));
+        modal.show();
+        
+        // Update maintenance log
+        addToMaintenanceLog('Starting maintenance tasks...');
+        
+        fetch('/api/maintenance/run', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+            .then(response => response.json())
+            .then(data => {
+                // Hide modal
+                modal.hide();
+                
+                if (data.status === 'success') {
+                    // Show success message
+                    const statusAlert = document.getElementById('maintenanceStatus');
+                    statusAlert.textContent = 'Maintenance completed successfully!';
+                    statusAlert.classList.remove('d-none', 'alert-danger');
+                    statusAlert.classList.add('alert-success');
+                    
+                    // Log results
+                    addToMaintenanceLog('Maintenance completed successfully.');
+                    
+                    if (data.results.data_retention && data.results.data_retention.deleted_counts) {
+                        const counts = data.results.data_retention.deleted_counts;
+                        Object.entries(counts).forEach(([table, count]) => {
+                            if (count > 0) {
+                                addToMaintenanceLog(`Deleted ${count} records from ${table}`);
+                            }
+                        });
+                    }
+                    
+                    addToMaintenanceLog(`Duration: ${(data.results.duration || 0).toFixed(2)} seconds`);
+                    
+                    // Refresh stats
+                    loadDatabaseStats();
+                } else {
+                    // Show error message
+                    const statusAlert = document.getElementById('maintenanceStatus');
+                    statusAlert.textContent = 'Maintenance failed: ' + (data.message || 'Unknown error');
+                    statusAlert.classList.remove('d-none', 'alert-success');
+                    statusAlert.classList.add('alert-danger');
+                    
+                    // Log error
+                    addToMaintenanceLog('Maintenance failed: ' + (data.message || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                // Hide modal
+                modal.hide();
+                
+                // Show error message
+                const statusAlert = document.getElementById('maintenanceStatus');
+                statusAlert.textContent = 'Error running maintenance: ' + error;
+                statusAlert.classList.remove('d-none', 'alert-success');
+                statusAlert.classList.add('alert-danger');
+                
+                // Log error
+                addToMaintenanceLog('Error running maintenance: ' + error);
+            });
+    }
+    
+    // Update database statistics display
+    function updateDatabaseStats(stats) {
+        // Update summary stats
+        document.getElementById('dbSize').textContent = stats.database ? `${stats.database.size_mb} MB` : 'N/A';
+        
+        let totalRows = 0;
+        let oldestDate = null;
+        let newestDate = null;
+        
+        // Update table stats
+        const tableStatsBody = document.getElementById('tableStatsBody');
+        tableStatsBody.innerHTML = '';
+        
+        // Process each table
+        Object.entries(stats).forEach(([tableName, tableStats]) => {
+            if (tableName === 'database') return; // Skip database object
+            
+            // Add to total rows
+            totalRows += tableStats.row_count || 0;
+            
+            // Track oldest/newest dates across all tables
+            if (tableStats.oldest_record) {
+                const oldestRecord = new Date(tableStats.oldest_record);
+                if (!oldestDate || oldestRecord < oldestDate) {
+                    oldestDate = oldestRecord;
+                }
+            }
+            
+            if (tableStats.newest_record) {
+                const newestRecord = new Date(tableStats.newest_record);
+                if (!newestDate || newestRecord > newestDate) {
+                    newestDate = newestRecord;
+                }
+            }
+            
+            // Create table row
+            const row = document.createElement('tr');
+            
+            // Format dates
+            const oldestFormatted = tableStats.oldest_record ? 
+                new Date(tableStats.oldest_record).toLocaleString() : 'N/A';
+            const newestFormatted = tableStats.newest_record ? 
+                new Date(tableStats.newest_record).toLocaleString() : 'N/A';
+            
+            row.innerHTML = `
+                <td><strong>${tableName}</strong></td>
+                <td>${tableStats.row_count?.toLocaleString() || 'N/A'}</td>
+                <td>${tableStats.estimated_size_mb || 'N/A'} MB</td>
+                <td>${oldestFormatted}</td>
+                <td>${newestFormatted}</td>
+                <td id="retention-${tableName}">Loading...</td>
+            `;
+            
+            tableStatsBody.appendChild(row);
+        });
+        
+        // Update total records
+        document.getElementById('dbRecords').textContent = totalRows.toLocaleString();
+        
+        // Update date range
+        if (oldestDate && newestDate) {
+            document.getElementById('dbDateRange').textContent = 
+                `${oldestDate.toLocaleDateString()} - ${newestDate.toLocaleDateString()}`;
+        } else {
+            document.getElementById('dbDateRange').textContent = 'N/A';
+        }
+    }
+    
+    // Update retention configuration display
+    function updateRetentionConfig(config) {
+        const container = document.getElementById('retentionConfig');
+        
+        // Create cards for each table
+        let html = '<div class="row">';
+        
+        Object.entries(config).forEach(([table, settings]) => {
+            html += `
+                <div class="col-md-4 mb-3">
+                    <div class="card h-100">
+                        <div class="card-header">
+                            <h6 class="mb-0">${table}</h6>
+                        </div>
+                        <div class="card-body">
+                            <ul class="list-group list-group-flush">
+                                ${settings.days ? 
+                                    `<li class="list-group-item">Keep for: <strong>${settings.days} days</strong></li>` : ''}
+                                ${settings.max_rows ? 
+                                    `<li class="list-group-item">Max rows: <strong>${settings.max_rows.toLocaleString()}</strong></li>` : ''}
+                                ${settings.expired_only ? 
+                                    `<li class="list-group-item">Remove expired only: <strong>Yes</strong></li>` : ''}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Also update retention policy in the table stats
+            const retentionCell = document.getElementById(`retention-${table}`);
+            if (retentionCell) {
+                let policyText = [];
+                if (settings.days) policyText.push(`${settings.days} days`);
+                if (settings.max_rows) policyText.push(`${settings.max_rows.toLocaleString()} rows`);
+                
+                retentionCell.textContent = policyText.join(', ');
+            }
+        });
+        
+        html += '</div>';
+        container.innerHTML = html;
+    }
+    
+    // Add entry to maintenance log
+    function addToMaintenanceLog(message) {
+        const log = document.getElementById('maintenanceLog');
+        const timestamp = new Date().toLocaleTimeString();
+        
+        // Create log entry
+        const entry = document.createElement('div');
+        entry.innerHTML = `<span class="text-muted">[${timestamp}]</span> ${message}`;
+        
+        // Add to log
+        log.appendChild(entry);
+        
+        // Scroll to bottom
+        log.scrollTop = log.scrollHeight;
+        
+        // Clear "no activity" message if it exists
+        const noActivity = log.querySelector('.text-muted:first-child');
+        if (noActivity && noActivity.textContent.includes('No maintenance activity')) {
+            log.removeChild(noActivity);
+        }
+    }
+    
+    // Show error message
+    function showError(message) {
+        const statusAlert = document.getElementById('maintenanceStatus');
+        statusAlert.textContent = message;
+        statusAlert.classList.remove('d-none', 'alert-success');
+        statusAlert.classList.add('alert-danger');
+        
+        addToMaintenanceLog('Error: ' + message);
+    }
+});
+</script>
+{% endblock %}

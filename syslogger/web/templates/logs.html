@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logs - SysLogger</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+        }
+        .navbar {
+            background-color: #343a40;
+        }
+        .sidebar {
+            background-color: #212529;
+            color: white;
+            min-height: calc(100vh - 56px);
+            padding-top: 20px;
+        }
+        .sidebar a {
+            color: #adb5bd;
+            text-decoration: none;
+            padding: 10px 20px;
+            display: block;
+        }
+        .sidebar a:hover, .sidebar a.active {
+            color: white;
+            background-color: #495057;
+        }
+        .card {
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            border: none;
+        }
+        .card-header {
+            background-color: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+            font-weight: bold;
+        }
+        .log-entry {
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+        }
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+        .log-timestamp {
+            font-size: 0.85rem;
+            color: #6c757d;
+        }
+        .log-info {
+            background-color: rgba(13, 202, 240, 0.1);
+            border-left: 4px solid #0dcaf0;
+        }
+        .log-warning {
+            background-color: rgba(255, 193, 7, 0.1);
+            border-left: 4px solid #ffc107;
+        }
+        .log-error {
+            background-color: rgba(220, 53, 69, 0.1);
+            border-left: 4px solid #dc3545;
+        }
+        .log-critical {
+            background-color: rgba(108, 117, 125, 0.1);
+            border-left: 4px solid #6c757d;
+        }
+        .log-body {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        .filters {
+            padding: 15px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <i class="bi bi-shield-lock"></i> SysLogger
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarSupportedContent">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/logs">Logs</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/alerts">Alerts</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/network">Network</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/anomalies">Anomalies</a>
+                    </li>
+                </ul>
+                <span class="navbar-text">
+                    <i class="bi bi-clock"></i> <span id="current-time">Loading...</span>
+                </span>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-md-2 sidebar">
+                <a href="/"><i class="bi bi-speedometer2 me-2"></i> Dashboard</a>
+                <a href="/logs" class="active"><i class="bi bi-journal-text me-2"></i> Logs</a>
+                <a href="/alerts"><i class="bi bi-exclamation-triangle me-2"></i> Alerts</a>
+                <a href="/network"><i class="bi bi-diagram-3 me-2"></i> Network</a>
+                <a href="/anomalies"><i class="bi bi-graph-up me-2"></i> Anomalies</a>
+                <a href="/threat-intel"><i class="bi bi-shield me-2"></i> Threat Intel</a>
+                <a href="/maintenance"><i class="bi bi-gear me-2"></i> Maintenance</a>
+            </div>
+
+            <!-- Main Content -->
+            <div class="col-md-10 py-4">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2>System Logs</h2>
+                    <div>
+                        <button class="btn btn-outline-secondary me-2" id="refresh-logs">
+                            <i class="bi bi-arrow-clockwise"></i> Refresh
+                        </button>
+                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#exportModal">
+                            <i class="bi bi-download"></i> Export
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Filters -->
+                <div class="filters mb-4">
+                    <div class="row">
+                        <div class="col-md-3 mb-3 mb-md-0">
+                            <label for="severity" class="form-label">Severity</label>
+                            <select class="form-select" id="severity">
+                                <option value="all">All Levels</option>
+                                <option value="info">Info</option>
+                                <option value="warning">Warning</option>
+                                <option value="error">Error</option>
+                                <option value="critical">Critical</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3 mb-3 mb-md-0">
+                            <label for="source" class="form-label">Source</label>
+                            <select class="form-select" id="source">
+                                <option value="all">All Sources</option>
+                                <option value="system">System</option>
+                                <option value="auth">Authentication</option>
+                                <option value="network">Network</option>
+                                <option value="application">Applications</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3 mb-md-0">
+                            <label for="timeRange" class="form-label">Time Range</label>
+                            <select class="form-select" id="timeRange">
+                                <option value="1h">Last Hour</option>
+                                <option value="12h">Last 12 Hours</option>
+                                <option value="24h" selected>Last 24 Hours</option>
+                                <option value="7d">Last 7 Days</option>
+                                <option value="30d">Last 30 Days</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                            <button class="btn btn-primary w-100" id="apply-filters">Apply</button>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col">
+                            <div class="input-group">
+                                <input type="text" class="form-control" placeholder="Search logs..." id="log-search">
+                                <button class="btn btn-outline-secondary" type="button">
+                                    <i class="bi bi-search"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Logs Card -->
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>System Logs</span>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="live-update" checked>
+                            <label class="form-check-label" for="live-update">Live Updates</label>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="log-body">
+                            <!-- Log entries will be loaded dynamically from syslog data -->
+                            <div id="log-entries-container">
+                                <!-- Logs will be populated here by JavaScript -->
+                                <div class="text-center py-4" id="loading-logs">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <div class="mt-2">Loading syslog data from router...</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-between p-2 bg-light border-top">
+                            <div>Showing <span id="visible-logs">0</span> of <span id="total-logs">0</span> logs</div>
+                            <div>
+                                <button class="btn btn-sm btn-outline-secondary">Previous</button>
+                                <button class="btn btn-sm btn-outline-secondary ms-2">Next</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Export Modal -->
+    <div class="modal fade" id="exportModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Export Logs</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="export-format" class="form-label">Format</label>
+                        <select class="form-select" id="export-format">
+                            <option value="csv">CSV</option>
+                            <option value="json">JSON</option>
+                            <option value="pdf">PDF</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="export-range" class="form-label">Time Range</label>
+                        <select class="form-select" id="export-range">
+                            <option value="current">Current View</option>
+                            <option value="24h">Last 24 Hours</option>
+                            <option value="7d">Last 7 Days</option>
+                            <option value="30d">Last 30 Days</option>
+                            <option value="custom">Custom Range</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="include-filters" checked>
+                            <label class="form-check-label" for="include-filters">
+                                Apply Current Filters
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary">Export</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/socket.io/client-dist/socket.io.js"></script>
+    <script>
+        // Update current time
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('current-time').textContent = now.toLocaleString();
+        }
+        updateTime();
+        setInterval(updateTime, 1000);
+
+        const logEntriesContainer = document.getElementById('log-entries-container');
+        const visibleLogsElement = document.getElementById('visible-logs');
+        const totalLogsElement = document.getElementById('total-logs');
+        const liveUpdateEnabled = document.getElementById('live-update');
+        let currentLogPage = 1;
+        let logsPerPage = 25;
+        let currentFilters = {
+            severity: 'all',
+            source: 'all',
+            timeRange: '24h',
+            searchTerm: ''
+        };
+
+        // Function to create log entry HTML element
+        function createLogEntryElement(log) {
+            const logEntry = document.createElement('div');
+            
+            // Determine severity class based on log level
+            let severityClass = 'log-info';
+            if (log.severity.toLowerCase().includes('warn')) severityClass = 'log-warning';
+            if (log.severity.toLowerCase().includes('err')) severityClass = 'log-error';
+            if (log.severity.toLowerCase().includes('crit') || log.severity.toLowerCase().includes('emerg')) severityClass = 'log-critical';
+            
+            logEntry.className = `log-entry ${severityClass}`;
+            
+            logEntry.innerHTML = `
+                <div class="d-flex justify-content-between">
+                    <div><strong>${log.severity}</strong> [${log.facility || 'system'}] ${log.header || ''}</div>
+                    <div class="log-timestamp">${new Date(log.timestamp).toLocaleString()}</div>
+                </div>
+                <div class="mt-1">${log.message}</div>
+            `;
+            
+            return logEntry;
+        }
+
+        // Function to fetch logs from API
+        function fetchLogs() {
+            const loadingElement = document.getElementById('loading-logs');
+            if (loadingElement) loadingElement.style.display = 'block';
+            
+            // Build query params based on filters
+            const params = new URLSearchParams();
+            params.append('page', currentLogPage);
+            params.append('limit', logsPerPage);
+            if (currentFilters.severity !== 'all') params.append('severity', currentFilters.severity);
+            if (currentFilters.source !== 'all') params.append('source', currentFilters.source);
+            params.append('timeRange', currentFilters.timeRange);
+            if (currentFilters.searchTerm) params.append('search', currentFilters.searchTerm);
+            
+            // Fetch logs from API
+            fetch(`/api/logs?${params.toString()}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (loadingElement) loadingElement.style.display = 'none';
+                    
+                    // Clear existing logs if this is not a real-time update
+                    if (!data.isUpdate) {
+                        logEntriesContainer.innerHTML = '';
+                    }
+                    
+                    // Update log count
+                    visibleLogsElement.textContent = data.logs.length;
+                    totalLogsElement.textContent = data.total;
+                    
+                    if (data.logs.length === 0) {
+                        const noLogs = document.createElement('div');
+                        noLogs.className = 'text-center py-4';
+                        noLogs.textContent = 'No logs matching your criteria';
+                        logEntriesContainer.appendChild(noLogs);
+                        return;
+                    }
+                    
+                    // Add log entries to container
+                    data.logs.forEach(log => {
+                        const logElement = createLogEntryElement(log);
+                        if (data.isUpdate) {
+                            // Add new logs to the top for real-time updates
+                            logEntriesContainer.insertBefore(logElement, logEntriesContainer.firstChild);
+                        } else {
+                            // Add logs normally for initial/refresh load
+                            logEntriesContainer.appendChild(logElement);
+                        }
+                    });
+                })
+                .catch(error => {
+                    console.error('Error fetching logs:', error);
+                    if (loadingElement) loadingElement.style.display = 'none';
+                    
+                    const errorElement = document.createElement('div');
+                    errorElement.className = 'alert alert-danger';
+                    errorElement.textContent = 'Error loading logs. Please try again.';
+                    logEntriesContainer.innerHTML = '';
+                    logEntriesContainer.appendChild(errorElement);
+                });
+        }
+
+        // Connect to Socket.IO for real-time updates
+        const socket = io();
+        socket.on('log_update', (data) => {
+            console.log('Log update received:', data);
+            
+            // Add new log entry if live updates are enabled
+            if (liveUpdateEnabled.checked) {
+                // Format incoming log for display
+                const logElement = createLogEntryElement(data);
+                
+                // Apply current filters
+                if (currentFilters.severity !== 'all' && !data.severity.toLowerCase().includes(currentFilters.severity.toLowerCase())) {
+                    return;
+                }
+                if (currentFilters.source !== 'all' && data.facility !== currentFilters.source) {
+                    return;
+                }
+                if (currentFilters.searchTerm && !data.message.toLowerCase().includes(currentFilters.searchTerm.toLowerCase())) {
+                    return;
+                }
+                
+                // Add new log entry to the top
+                logEntriesContainer.insertBefore(logElement, logEntriesContainer.firstChild);
+                
+                // Update counts
+                const currentVisible = parseInt(visibleLogsElement.textContent, 10);
+                const currentTotal = parseInt(totalLogsElement.textContent, 10);
+                visibleLogsElement.textContent = currentVisible + 1;
+                totalLogsElement.textContent = currentTotal + 1;
+            }
+        });
+
+        // Implement filter functionality
+        document.getElementById('apply-filters').addEventListener('click', function() {
+            // Update filters based on selected values
+            currentFilters.severity = document.getElementById('severity').value;
+            currentFilters.source = document.getElementById('source').value;
+            currentFilters.timeRange = document.getElementById('timeRange').value;
+            currentFilters.searchTerm = document.getElementById('log-search').value;
+            
+            // Reset to first page when applying filters
+            currentLogPage = 1;
+            
+            // Fetch logs with new filters
+            fetchLogs();
+        });
+
+        // Refresh logs
+        document.getElementById('refresh-logs').addEventListener('click', function() {
+            fetchLogs();
+        });
+        
+        // Initialize logs on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            fetchLogs();
+        });
+    </script>
+</body>
+</html>

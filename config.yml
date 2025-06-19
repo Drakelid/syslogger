@@ -1,0 +1,58 @@
+# SysLogger Configuration File
+
+logging:
+  log_file: '/logs/syslog.log'
+  log_level: 'INFO'  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  max_bytes: 1073741824  # 1GB
+  backup_count: 5
+  log_to_stdout: false
+
+syslog:
+  bind_host: '0.0.0.0'
+  udp_port: 514
+  tcp_port: 514
+  enable_udp: true
+  enable_tcp: true
+
+web:
+  enable_web: true
+  web_port: 8080
+  web_log_lines: 100
+
+detection:
+  deauth_threshold: 3
+  auth_fail_threshold: 5
+  port_scan_threshold: 10
+  dhcp_req_threshold: 20
+  firewall_threshold: 20
+  dos_threshold: 10
+  detection_window: 600  # seconds
+
+storage:
+  db_file: '/logs/syslog.db'
+  attacker_info_db: '/logs/attacker_info.db'
+  ml_models_dir: '/logs/ml_models'
+
+forwarding:
+  forward_host: null  # Set to forward logs to another syslog server
+  forward_port: null  # Example: 514
+
+scanning:
+  enable_scan: false  # Set to true to enable port scanning
+  port_scan_timeout: 5  # seconds
+  geoip_db_path: '/logs/GeoLite2-City.mmdb'
+
+threat_intel:
+  api_key: ''  # Your threat intelligence API key
+  thread_pool_size: 5
+
+# New Network Traffic Analysis Configuration
+network:
+  enable_pcap: false
+  pcap_interface: 'eth0'
+  pcap_bpf_filter: 'port not 22'  # BPF filter to exclude SSH traffic
+  pcap_snaplen: 1500  # Maximum bytes to capture per packet
+  pcap_timeout: 100  # milliseconds
+  pcap_file: '/logs/capture.pcap'  # Where to save PCAP files
+  enable_netflow: false
+  netflow_port: 2055
